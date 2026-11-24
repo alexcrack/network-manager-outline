@@ -1,0 +1,13 @@
+{
+    "KPlugin": {
+        "Category": "VPNService",
+        "Description": "Connect to Outline (Shadowsocks) servers using an access key",
+        "EnabledByDefault": false,
+        "Icon": "",
+        "License": "GPL",
+        "Name": "Outline VPN",
+        "Version": "0.1",
+        "Website": ""
+    },
+    "X-NetworkManager-Services": "org.freedesktop.NetworkManager.outline"
+}

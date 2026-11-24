@@ -1,0 +1,5 @@
+/build/
+/bin/
+/plasma/build/
+/plasma/third_party/plasma-nm/
+*.so

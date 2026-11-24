@@ -1,0 +1,8 @@
+[VPN Connection]
+name=outline
+service=org.freedesktop.NetworkManager.outline
+program=@LIBEXECDIR@/nm-outline-service
+supports-multiple-connections=false
+supports-safe-private-file-access=true
+
+# [libnm] / [GNOME] sections are added when the GNOME editor plugin exists (phase 4).

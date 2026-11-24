@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>OutlineAuth</class>
+ <widget class="QWidget" name="OutlineAuth">
+  <layout class="QFormLayout" name="formLayout">
+   <item row="0" column="0">
+    <widget class="QLabel" name="accessKeyLabel">
+     <property name="text"><string>Access key:</string></property>
+    </widget>
+   </item>
+   <item row="0" column="1">
+    <widget class="PasswordField" name="accessKey"/>
+   </item>
+  </layout>
+ </widget>
+ <customwidgets>
+  <customwidget>
+   <class>PasswordField</class>
+   <extends>QLineEdit</extends>
+   <header>passwordfield.h</header>
+  </customwidget>
+ </customwidgets>
+</ui>
