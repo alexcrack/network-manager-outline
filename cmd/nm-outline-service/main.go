@@ -3,6 +3,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"log/slog"
 	"os"
@@ -15,7 +16,7 @@ import (
 
 func main() {
 	busName := flag.String("bus-name", outline.ServiceName, "D-Bus service name to claim")
-	debug := flag.Bool("debug", os.Getenv("NM_VPN_LOG_LEVEL") != "", "enable debug logging")
+	debug := flag.Bool("debug", os.Getenv("NM_VPN_LOG_LEVEL") != "", "enable debug logging; keep running after disconnect")
 	flag.Parse()
 
 	level := slog.LevelInfo
@@ -24,13 +25,16 @@ func main() {
 	}
 	log := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: level}))
 
-	p := nmvpn.New(*busName, outline.NewHandler(log), log)
+	p := nmvpn.New(outline.NewHandler(log), nmvpn.Options{
+		BusName:   *busName,
+		WatchPeer: !*debug, // like nm-openvpn-service: quit with NM unless debugging
+		Logger:    log,
+	})
 
-	sig := make(chan os.Signal, 1)
-	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
-	go func() { <-sig; p.Stop() }()
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
 
-	if err := p.Run(); err != nil {
+	if err := p.Run(ctx); err != nil {
 		log.Error("fatal", "err", err)
 		os.Exit(1)
 	}
