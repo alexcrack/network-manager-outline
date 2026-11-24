@@ -40,8 +40,23 @@ server), DNS and teardown.
 
 ```sh
 make service            # Go service -> bin/nm-outline-service
-sudo make install       # service + .name + D-Bus policy
-make plasma             # Plasma plugin (fetches plasma-nm headers matching the installed version)
+```
+
+Install the service. `sudo make install` does not work yet: it rebuilds as
+root, and sudo's PATH has no `go`. Until that is fixed, install by hand:
+
+```sh
+sudo install -Dm755 bin/nm-outline-service /usr/libexec/nm-outline-service
+sed 's|@LIBEXECDIR@|/usr/libexec|' data/nm-outline-service.name.in | \
+    sudo tee /usr/lib/NetworkManager/VPN/nm-outline-service.name >/dev/null
+sudo install -Dm644 data/nm-outline-service.conf /usr/share/dbus-1/system.d/nm-outline-service.conf
+sudo systemctl restart NetworkManager   # only needed the first time
+```
+
+Plasma plugin (not functional yet, see [docs/plan.md](docs/plan.md)):
+
+```sh
+make plasma             # fetches plasma-nm headers matching the installed version
 sudo make install-plasma
 ```
 
