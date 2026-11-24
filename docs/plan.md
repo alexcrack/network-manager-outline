@@ -26,14 +26,17 @@ Goal: `nmcli connection up` works with a real `ss://` key.
    - [x] Full introspection data
    - [x] Idle exit (180 s) and peer watching (quit when NetworkManager disconnects)
    - [x] Unit tests and integration tests against a private `dbus-daemon`
-2. **Fill in the stubs**
-   - [ ] `internal/tun`: open `/dev/net/tun` with `TUNSETIFF` (`IFF_TUN|IFF_NO_PI`)
-   - [ ] `internal/outline/accesskey.go`: parse `ss://` (SIP002 and legacy base64), keep `?prefix=`, extract the server host
-   - [ ] `internal/outline/device.go`: add outline-sdk; stream dialer, packet listener, UDP relay with DNS-truncate fallback, `lwip2transport` device
-   - [ ] `internal/outline/handler.go`: the connect flow (see [architecture.md](architecture.md#connection-lifecycle))
-3. **Tests**
-   - [ ] Access-key parsing (sample keys, prefix, fragment, legacy format)
-   - [ ] Handler test with a fake emitter (no root)
+2. **Fill in the stubs (done)**
+   - [x] `internal/tun`: open `/dev/net/tun` with `TUNSETIFF` (`IFF_TUN|IFF_NO_PI`), set MTU, bring the link up
+   - [x] `internal/outline/accesskey.go`: parse `ss://` (SIP002 and legacy base64), keep `?prefix=`, resolve the server, build configurl strings with the resolved IP
+   - [x] `internal/outline/device.go`: outline-sdk v0.1.0 / sdk/x v0.3.0; stream dialer, packet listener, UDP relay with DNS-truncate fallback, `lwip2transport` device, TCP check, UDP probe
+   - [x] `internal/outline/handler.go`: the connect flow (see [architecture.md](architecture.md#connection-lifecycle))
+3. **Tests (done)**
+   - [x] Access-key parsing (Outline SIP002, plain and std-base64 userinfo, legacy base64, prefix, fragment, IPv6 server, errors)
+   - [x] Generated configurl strings accepted by outline-sdk, with and without a transport prefix
+   - [x] End-to-end through the real outline-sdk stack against an in-process Shadowsocks server: success, wrong password, unreachable server
+   - [x] Handler flow with fake TUN/stack/emitter: reported config, `ipv6=off`, check failure, pump failure, disconnect during setup, bad settings
+   - [ ] TUN test needs root: `sudo -E go test ./internal/tun` (skipped otherwise)
 4. **Manual end-to-end check** (needs root and a real key)
    - [ ] Default route through `outline0`, host route to the server via the physical link
    - [ ] DNS through the tunnel (`resolvectl status`)
@@ -41,8 +44,8 @@ Goal: `nmcli connection up` works with a real `ss://` key.
    - [ ] `nmcli connection down` cleans up; reconnect works
 
 ### Phase 2: dynamic keys and robustness
-- [ ] `ssconf://` keys: fetch over HTTPS; response is an `ss://` URL or JSON (`server`, `server_port`, `password`, `method`, `prefix`)
-- [ ] IPv6 modes: `tunnel` (ULA address and `::/0` into the tunnel) and `block`
+- [ ] `ssconf://` keys (currently rejected with a clear error): fetch over HTTPS; response is an `ss://` URL or JSON (`server`, `server_port`, `password`, `method`, `prefix`)
+- [ ] IPv6 `block` mode (route IPv6 into the tunnel and reject it there). `tunnel` (default) and `off` exist since phase 1.
 - [ ] Reconnect on network change (`can-persist`, re-resolve the server)
 - [ ] Interactive secrets (`ConnectInteractive`, `SecretsRequired`, `NewSecrets`) if needed
 - [ ] Logging to the journal
@@ -68,8 +71,8 @@ language boundary. NetworkManager talks to VPN services over D-Bus only, so
 libnm is not required: `internal/nmvpn` implements the protocol with `godbus`.
 The service builds to a single binary.
 
-Costs: a larger binary (about 10 to 15 MB), cgo for lwIP (a C compiler is needed
-to build), and we must match libnm's plugin behaviour ourselves (see
+Costs: a larger binary (16 MB; it links only libc), cgo for lwIP (a C compiler
+is needed to build), and we must match libnm's plugin behaviour ourselves (see
 [nm-vpn-dbus-protocol.md](nm-vpn-dbus-protocol.md)).
 
 ### NetworkManager owns routing and DNS
@@ -83,6 +86,24 @@ clean teardown.
 The settings dialog must match the desktop: C++/Qt for Plasma, C/GTK for
 GNOME. The service and the UI share only the setting names
 (`internal/outline/keys.go` and `plasma/src/nm-outline-service.h`).
+
+### Server hostname replaced by its IP
+The service resolves the server's hostname once, before NetworkManager
+changes routes and DNS, and dials that IP. Dialing the hostname would loop:
+after the tunnel is up, DNS goes through the tunnel. NetworkManager also
+routes only the resolved IP (the `gateway` in `Config`) around the tunnel.
+
+### Transport prefix applies to TCP only
+Prefixes such as `split:2` and `tlsfrag:1` only exist for stream dialers in
+outline-sdk, so the prefix is applied to the TCP dialer and UDP uses the plain
+Shadowsocks config. Found by a test against the SDK.
+
+### Fail early on a bad key or unreachable server
+Before reporting the tunnel to NetworkManager, the service resolves a name
+over TCP through the server. A wrong password or unreachable server then fails
+the connection in the dialog instead of leaving a dead tunnel. The UDP probe
+runs after the tunnel is up so it does not delay connecting; DNS works over
+TCP (DNS-truncate mode) until the probe confirms UDP.
 
 ### Makefile as the entry point
 Go and CMake do the building; the Makefile wraps them and installs data files
