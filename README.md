@@ -38,20 +38,17 @@ server), DNS and teardown.
 
 ## Building
 
-```sh
-make service            # Go service -> bin/nm-outline-service
-```
-
-Install the service. `sudo make install` does not work yet: it rebuilds as
-root, and sudo's PATH has no `go`. Until that is fixed, install by hand:
+Build as your user, install as root. Install targets never build, because
+sudo's PATH usually has no `go`.
 
 ```sh
-sudo install -Dm755 bin/nm-outline-service /usr/libexec/nm-outline-service
-sed 's|@LIBEXECDIR@|/usr/libexec|' data/nm-outline-service.name.in | \
-    sudo tee /usr/lib/NetworkManager/VPN/nm-outline-service.name >/dev/null
-sudo install -Dm644 data/nm-outline-service.conf /usr/share/dbus-1/system.d/nm-outline-service.conf
-sudo systemctl restart NetworkManager   # only needed the first time
+make                                    # -> bin/nm-outline-service
+sudo make install                       # service, .name file, D-Bus policy
+sudo systemctl restart NetworkManager   # first install only
 ```
+
+`sudo make uninstall` removes the installed files. `PREFIX` and `DESTDIR` work
+as usual.
 
 Plasma plugin (not functional yet, see [docs/plan.md](docs/plan.md)):
 

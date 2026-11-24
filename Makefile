@@ -1,23 +1,33 @@
+# Build as your user, install as root:
+#
+#   make && sudo make install
+#
+# Install targets never build: sudo's PATH usually has no `go`, and building
+# as root would leave root-owned files in the tree and the Go cache.
+
 PREFIX     ?= /usr
 LIBEXECDIR ?= $(PREFIX)/libexec
 NMVPNDIR   ?= $(PREFIX)/lib/NetworkManager/VPN
 DBUSDIR    ?= $(PREFIX)/share/dbus-1/system.d
 DESTDIR    ?=
 
+GO  ?= go
+BIN := bin/nm-outline-service
+
 PLASMA_NM_VERSION ?= $(shell dpkg-query -W -f='$${Version}' plasma-nm 2>/dev/null | sed -E 's/^[0-9]+://; s/-.*//')
 
-.PHONY: all service test vet plasma plasma-deps install install-service install-plasma clean
+.PHONY: all service test vet plasma install install-service install-plasma uninstall clean
 
 all: service
 
 service:
-	go build -trimpath -o bin/nm-outline-service ./cmd/nm-outline-service
+	$(GO) build -trimpath -o $(BIN) ./cmd/nm-outline-service
 
 test:
-	go test ./...
+	$(GO) test ./...
 
 vet:
-	go vet ./...
+	$(GO) vet ./...
 
 plasma/third_party/plasma-nm:
 	git clone --depth 1 --branch v$(PLASMA_NM_VERSION) https://invent.kde.org/plasma/plasma-nm.git $@
@@ -28,14 +38,25 @@ plasma: plasma/third_party/plasma-nm
 
 install: install-service
 
-install-service: service
-	install -Dm755 bin/nm-outline-service $(DESTDIR)$(LIBEXECDIR)/nm-outline-service
-	sed 's|@LIBEXECDIR@|$(LIBEXECDIR)|g' data/nm-outline-service.name.in > bin/nm-outline-service.name
-	install -Dm644 bin/nm-outline-service.name $(DESTDIR)$(NMVPNDIR)/nm-outline-service.name
+install-service:
+	@test -x $(BIN) || { echo "$(BIN) not built; run 'make' as your user first" >&2; exit 1; }
+	@stale=$$(find cmd internal go.mod go.sum -newer $(BIN) -print -quit); \
+	  test -z "$$stale" || echo "warning: $$stale is newer than $(BIN); run 'make' to rebuild" >&2
+	install -Dm755 $(BIN) $(DESTDIR)$(LIBEXECDIR)/nm-outline-service
+	install -d $(DESTDIR)$(NMVPNDIR)
+	sed 's|@LIBEXECDIR@|$(LIBEXECDIR)|g' data/nm-outline-service.name.in > $(DESTDIR)$(NMVPNDIR)/nm-outline-service.name
+	chmod 644 $(DESTDIR)$(NMVPNDIR)/nm-outline-service.name
 	install -Dm644 data/nm-outline-service.conf $(DESTDIR)$(DBUSDIR)/nm-outline-service.conf
+	@echo "Installed. On first install, run: sudo systemctl restart NetworkManager"
 
-install-plasma: plasma
+install-plasma:
+	@test -d plasma/build || { echo "Plasma plugin not built; run 'make plasma' as your user first" >&2; exit 1; }
 	DESTDIR=$(DESTDIR) cmake --install plasma/build
+
+uninstall:
+	rm -f $(DESTDIR)$(LIBEXECDIR)/nm-outline-service
+	rm -f $(DESTDIR)$(NMVPNDIR)/nm-outline-service.name
+	rm -f $(DESTDIR)$(DBUSDIR)/nm-outline-service.conf
 
 clean:
 	rm -rf bin plasma/build

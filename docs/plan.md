@@ -25,8 +25,9 @@ are created with `nmcli`.
 
 ## Next steps
 
-1. Finish phase 1: retest the PR #4 fixes, check the Plasma applet with a
-   `nmcli`-created connection, and fix `sudo make install`.
+1. Finish phase 1: retest the wrong key (expect a login-failure message) with
+   other VPNs disconnected, and check the Plasma applet with a
+   `nmcli`-created connection.
 2. Phase 3 (Plasma plugin) before phase 2. The goal is connecting from the
    system dialog, and phase 2 items are robustness work that the current
    service can do without. Doing the UI earlier also finds out sooner whether
@@ -80,7 +81,7 @@ Goal: `nmcli connection up` works with a real `ss://` key.
    - nmcli printed "Unknown reason" for a wrong key. NetworkManager only gives a specific reason for `LOGIN_FAILED`, and the service always sent `CONNECT_FAILED`, which disconnecting during STARTING sent again on top. The service now checks plain TCP reachability first, reports a timeout through Shadowsocks as `LOGIN_FAILED` (wrong key), and keeps the first reported reason.
    - Note: the official Outline client was connected during this retest (`outline-tun1`, source address `10.0.85.5` in the log), so the check traffic went through it. Disconnect other VPNs when testing.
 5. **Install**
-   - [ ] `sudo make install` fails: the install target depends on the phony `service` target, so it runs `go build` as root, and sudo's PATH has no `go`. Make install depend on the built binary instead, so `make && sudo make install` works. Until then, install by hand (see the README).
+   - [x] `make && sudo make install` works. Install targets no longer build (they depended on the phony `service` target, so `sudo make install` ran `go build` as root, and sudo's PATH has no `go`). They fail clearly if nothing is built and warn if sources are newer than the binary. Added `uninstall`.
 
 ### Phase 2: dynamic keys and robustness
 - [ ] `ssconf://` keys (currently rejected with a clear error): fetch over HTTPS; response is an `ss://` URL or JSON (`server`, `server_port`, `password`, `method`, `prefix`)
