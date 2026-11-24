@@ -86,6 +86,7 @@ type Plugin struct {
 	gotIP4    bool
 	gotIP6    bool
 	cancel    context.CancelFunc
+	failed    bool // a Failure was emitted for the current connection
 	peer      string
 	connTimer *time.Timer
 	quitTimer *time.Timer
@@ -213,6 +214,7 @@ func (p *Plugin) connect(sender string, s ConnectionSettings) error {
 	p.cancel = cancel
 	p.peer = sender
 	p.gotConfig, p.hasIP4, p.hasIP6, p.gotIP4, p.gotIP6 = false, false, false, false, false
+	p.failed = false
 	// Enter STARTING before calling the handler so config it emits from its
 	// goroutines is never seen in the stopped state.
 	p.setStateLocked(StateStarting)
@@ -262,7 +264,11 @@ func (p *Plugin) disconnect() error {
 		p.mu.Unlock()
 		return nil
 	case StateStarting:
-		p.emitLocked("Failure", uint32(FailureConnectFailed))
+		// Unlike libnm, keep a reason the handler already reported:
+		// NM keeps only the last one, and LOGIN_FAILED is more useful.
+		if !p.failed {
+			p.emitLocked("Failure", uint32(FailureConnectFailed))
+		}
 	}
 	p.setStateLocked(StateStopping)
 	cancel := p.cancel
@@ -308,6 +314,7 @@ func (p *Plugin) SetIP6Config(c IPConfig) error {
 
 func (p *Plugin) Fail(f Failure) {
 	p.mu.Lock()
+	p.failed = true
 	p.emitLocked("Failure", uint32(f))
 	p.mu.Unlock()
 	go func() {

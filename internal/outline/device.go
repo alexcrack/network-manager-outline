@@ -2,10 +2,13 @@ package outline
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
+	"net"
 	"net/netip"
+	"os"
 	"sync"
 	"time"
 
@@ -39,6 +42,7 @@ var registry = configurl.NewDefaultRegistry()
 //
 // lwIP is a process-wide singleton: only one Device may exist at a time.
 type Device struct {
+	server   netip.AddrPort
 	ip       network.IPDevice
 	sd       transport.StreamDialer
 	pl       transport.PacketListener
@@ -51,7 +55,7 @@ type Device struct {
 
 // NewDevice builds the transport stack. It does no network I/O.
 func NewDevice(ctx context.Context, t Transport) (*Device, error) {
-	d := &Device{}
+	d := &Device{server: t.Server}
 	var err error
 	if d.sd, err = configurl.New[transport.StreamDialer](ctx, registry, t.Stream); err != nil {
 		return nil, fmt.Errorf("create stream dialer: %w", err)
@@ -72,6 +76,25 @@ func NewDevice(ctx context.Context, t Transport) (*Device, error) {
 		return nil, fmt.Errorf("configure lwIP: %w", err)
 	}
 	return d, nil
+}
+
+// CheckServer opens and closes a plain TCP connection to the server.
+func (d *Device) CheckServer(ctx context.Context) error {
+	var dialer net.Dialer
+	c, err := dialer.DialContext(ctx, "tcp", d.server.String())
+	if err != nil {
+		return err
+	}
+	return c.Close()
+}
+
+// IsTimeout reports whether err is a timeout. Outline servers do not reply
+// to a wrong key: they drain the connection until the client gives up, so
+// after CheckServer succeeded, a CheckTCP timeout means a wrong access key.
+func IsTimeout(err error) bool {
+	var ne net.Error
+	return errors.Is(err, context.DeadlineExceeded) || errors.Is(err, os.ErrDeadlineExceeded) ||
+		(errors.As(err, &ne) && ne.Timeout())
 }
 
 // CheckTCP resolves probeDomain over TCP through the tunnel. It fails if the

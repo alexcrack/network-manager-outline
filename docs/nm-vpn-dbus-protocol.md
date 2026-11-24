@@ -84,7 +84,7 @@ Follows `nm_vpn_service_plugin_disconnect`:
 | STOPPING | error `StoppingInProgress` |
 | STOPPED | error `AlreadyStopped` |
 | INIT | STOPPED, success |
-| STARTING | emit `Failure(CONNECT_FAILED)`, then as STARTED |
+| STARTING | emit `Failure(CONNECT_FAILED)` unless a failure was already emitted, then as STARTED |
 | STARTED | STOPPING → cancel connection context → `Handler.Disconnect` → STOPPED |
 
 ### Timers and lifetime
@@ -168,6 +168,7 @@ does this and is covered by a test.
 | Entering STARTING | after `connect()` returns success | before calling `Handler.Connect` | Handler goroutines may emit config immediately; this avoids config arriving in INIT. A failed connect goes STARTING → STOPPED. |
 | Failed-connect stop | idle callback | 100 ms timer | godbus sends the reply after the method returns; the delay keeps the reply before the STOPPED signal. |
 | Idle timer at startup | only after STOPPED | also at startup | A service started but never connected also exits. |
+| Failure reason during STARTING | disconnecting emits `CONNECT_FAILED` after the plugin's own `Failure` | only if no `Failure` was emitted yet | NM keeps only the last reason, and `LOGIN_FAILED` is the one nmcli and Plasma can explain. |
 | `Fail` → disconnect | synchronous | asynchronous | Lets handlers call `Fail` from goroutines that `Disconnect` waits for, without deadlock. |
 | `NeedSecrets` idle reschedule | always | only in INIT/STOPPED | Avoids arming the quit timer during an active connection. |
 | `Ip4Config` compat merge | copies `tundev`, `gateway`, `mtu`, `banner` into `Ip4Config` | not done | Only needed for NetworkManager before 1.2. |

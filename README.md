@@ -38,10 +38,22 @@ server), DNS and teardown.
 
 ## Building
 
+Build as your user, install as root. Install targets never build, because
+sudo's PATH usually has no `go`.
+
 ```sh
-make service            # Go service -> bin/nm-outline-service
-sudo make install       # service + .name + D-Bus policy
-make plasma             # Plasma plugin (fetches plasma-nm headers matching the installed version)
+make                                    # -> bin/nm-outline-service
+sudo make install                       # service, .name file, D-Bus policy
+sudo systemctl restart NetworkManager   # first install only
+```
+
+`sudo make uninstall` removes the installed files. `PREFIX` and `DESTDIR` work
+as usual.
+
+Plasma plugin (not functional yet, see [docs/plan.md](docs/plan.md)):
+
+```sh
+make plasma             # fetches plasma-nm headers matching the installed version
 sudo make install-plasma
 ```
 

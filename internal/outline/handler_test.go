@@ -3,6 +3,7 @@ package outline
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/netip"
@@ -35,6 +36,7 @@ func (f *fakeTUN) isClosed() bool {
 }
 
 type fakeStack struct {
+	serverErr error
 	checkErr  error
 	pumpErr   chan error // send to make Pump fail
 	transport Transport
@@ -43,6 +45,7 @@ type fakeStack struct {
 	closed    bool
 }
 
+func (s *fakeStack) CheckServer(context.Context) error          { return s.serverErr }
 func (s *fakeStack) CheckTCP(context.Context, netip.Addr) error { return s.checkErr }
 func (s *fakeStack) ProbeUDP(context.Context, netip.Addr) (bool, error) {
 	s.mu.Lock()
@@ -70,6 +73,7 @@ type fakeEmitter struct {
 	ip4     *nmvpn.IPConfig
 	ip6     *nmvpn.IPConfig
 	failed  bool
+	reason  nmvpn.Failure
 	events  chan string
 }
 
@@ -97,9 +101,10 @@ func (e *fakeEmitter) SetIP6Config(c nmvpn.IPConfig) error {
 	e.events <- "ip6"
 	return nil
 }
-func (e *fakeEmitter) Fail(nmvpn.Failure) {
+func (e *fakeEmitter) Fail(r nmvpn.Failure) {
 	e.mu.Lock()
 	e.failed = true
+	e.reason = r
 	e.mu.Unlock()
 	e.events <- "fail"
 	e.cancel()
@@ -212,19 +217,35 @@ func TestHandlerIPv6OffNeverDefault(t *testing.T) {
 	}
 }
 
-func TestHandlerCheckFailure(t *testing.T) {
-	f := newFixture(&fakeStack{checkErr: errors.New("connection reset")})
-	opened := false
-	f.h.openTUN = func() (tunnelDevice, error) { opened = true; return f.tun, nil }
-	if err := f.h.Connect(f.ctx, settings(nil, map[string]string{SecretAccessKey: testKey}), f.em); err != nil {
-		t.Fatal(err)
+func TestHandlerCheckFailures(t *testing.T) {
+	tests := []struct {
+		name  string
+		stack *fakeStack
+		want  nmvpn.Failure
+	}{
+		{"server unreachable", &fakeStack{serverErr: errors.New("connection refused")}, nmvpn.FailureConnectFailed},
+		{"wrong key (timeout)", &fakeStack{checkErr: fmt.Errorf("read salt: %w", context.DeadlineExceeded)}, nmvpn.FailureLoginFailed},
+		{"server closed", &fakeStack{checkErr: io.EOF}, nmvpn.FailureConnectFailed},
 	}
-	if ev := f.em.next(t); ev != "fail" {
-		t.Fatalf("event %q, want fail", ev)
-	}
-	f.disconnect(t)
-	if opened || !f.stack.closed || f.em.generic != nil {
-		t.Fatalf("opened=%v stack closed=%v config sent=%v", opened, f.stack.closed, f.em.generic != nil)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			f := newFixture(tt.stack)
+			opened := false
+			f.h.openTUN = func() (tunnelDevice, error) { opened = true; return f.tun, nil }
+			if err := f.h.Connect(f.ctx, settings(nil, map[string]string{SecretAccessKey: testKey}), f.em); err != nil {
+				t.Fatal(err)
+			}
+			if ev := f.em.next(t); ev != "fail" {
+				t.Fatalf("event %q, want fail", ev)
+			}
+			f.disconnect(t)
+			if f.em.reason != tt.want {
+				t.Fatalf("reason = %d, want %d", f.em.reason, tt.want)
+			}
+			if opened || !f.stack.closed || f.em.generic != nil {
+				t.Fatalf("opened=%v stack closed=%v config sent=%v", opened, f.stack.closed, f.em.generic != nil)
+			}
+		})
 	}
 }
 

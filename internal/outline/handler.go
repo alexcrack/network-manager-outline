@@ -37,6 +37,7 @@ type tunnelDevice interface {
 
 // stack is the outline-sdk side; *Device implements it.
 type stack interface {
+	CheckServer(ctx context.Context) error
 	CheckTCP(ctx context.Context, resolver netip.Addr) error
 	ProbeUDP(ctx context.Context, resolver netip.Addr) (bool, error)
 	Pump(tun io.ReadWriter, log *slog.Logger) error
@@ -138,14 +139,15 @@ func (s *session) run(ctx context.Context) {
 		s.log.Info("tunnel stopped")
 	}()
 
-	fail := func(step string, err error) {
+	failWith := func(reason nmvpn.Failure, step string, err error) {
 		if ctx.Err() != nil {
 			return // already tearing down
 		}
 		s.log.Error("tunnel failed", "step", step, "err", s.st.AccessKey.Redact(err.Error()))
-		s.e.Fail(nmvpn.FailureConnectFailed)
+		s.e.Fail(reason)
 		<-ctx.Done()
 	}
+	fail := func(step string, err error) { failWith(nmvpn.FailureConnectFailed, step, err) }
 
 	// 1. Resolve the server before NM changes routes and DNS.
 	rctx, cancel := context.WithTimeout(ctx, resolveTimeout)
@@ -157,9 +159,9 @@ func (s *session) run(ctx context.Context) {
 	}
 	s.log = s.log.With("server_ip", serverIP)
 
-	// 2. Transport stack (no I/O) and a TCP check through the server, so a
-	//    wrong key or unreachable server fails the connection instead of
-	//    leaving a dead tunnel.
+	// 2. Transport stack (no I/O), then checks so that an unreachable server
+	//    or a wrong key fails the connection instead of leaving a dead tunnel:
+	//    a plain TCP connect, then a DNS lookup over TCP through the server.
 	dev, err := s.h.newStack(ctx, s.st.AccessKey.TransportConfig(serverIP, s.st.TransportPrefix))
 	if err != nil {
 		fail("transport", err)
@@ -167,12 +169,26 @@ func (s *session) run(ctx context.Context) {
 	}
 	cleanup = append(cleanup, func() { dev.Close() })
 
-	resolver := s.st.checkResolver()
 	cctx, cancel := context.WithTimeout(ctx, checkTimeout)
-	err = dev.CheckTCP(cctx, resolver)
+	err = dev.CheckServer(cctx)
 	cancel()
 	if err != nil {
-		fail("check", fmt.Errorf("cannot reach the internet through the server: %w", err))
+		fail("check", fmt.Errorf("server unreachable: %w", err))
+		return
+	}
+
+	resolver := s.st.checkResolver()
+	cctx, cancel = context.WithTimeout(ctx, checkTimeout)
+	err = dev.CheckTCP(cctx, resolver)
+	cancel()
+	switch {
+	case err == nil:
+	case IsTimeout(err):
+		failWith(nmvpn.FailureLoginFailed, "check",
+			fmt.Errorf("server did not answer; the access key is probably wrong: %w", err))
+		return
+	default:
+		fail("check", fmt.Errorf("server closed the connection; it may be unable to reach the internet: %w", err))
 		return
 	}
 
