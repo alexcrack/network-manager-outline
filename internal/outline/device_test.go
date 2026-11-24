@@ -189,4 +189,6 @@ func TestDeviceCheckTCPUnreachable(t *testing.T) {
 	}
 }
 
-func itoa(p uint16) string { return netip.AddrPortFrom(netip.IPv4Unspecified(), p).String()[len("0.0.0.0:"):] }
+func itoa(p uint16) string {
+	return netip.AddrPortFrom(netip.IPv4Unspecified(), p).String()[len("0.0.0.0:"):]
+}

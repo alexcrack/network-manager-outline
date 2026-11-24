@@ -25,33 +25,33 @@ func TestParseAccessKey(t *testing.T) {
 		port                           uint16
 	}{
 		{
-			name: "outline SIP002",
-			key:  "ss://" + b64url(testMethod+":s3cret") + "@203.0.113.7:8388/?outline=1#My%20Server",
+			name:   "outline SIP002",
+			key:    "ss://" + b64url(testMethod+":s3cret") + "@203.0.113.7:8388/?outline=1#My%20Server",
 			method: testMethod, pass: "s3cret", host: "203.0.113.7", port: 8388, nm: "My Server",
 		},
 		{
-			name: "SIP002 padded std base64",
-			key:  "ss://" + base64.StdEncoding.EncodeToString([]byte("aes-256-gcm:pw")) + "@vpn.example.com:443",
+			name:   "SIP002 padded std base64",
+			key:    "ss://" + base64.StdEncoding.EncodeToString([]byte("aes-256-gcm:pw")) + "@vpn.example.com:443",
 			method: "aes-256-gcm", pass: "pw", host: "vpn.example.com", port: 443,
 		},
 		{
-			name: "SIP002 plain userinfo with prefix",
-			key:  "ss://" + testMethod + ":p%40ss@vpn.example.com:443?prefix=%16%03%01%00%C2%A8%01%01",
+			name:   "SIP002 plain userinfo with prefix",
+			key:    "ss://" + testMethod + ":p%40ss@vpn.example.com:443?prefix=%16%03%01%00%C2%A8%01%01",
 			method: testMethod, pass: "p@ss", host: "vpn.example.com", port: 443, prefix: "\x16\x03\x01\x00¨\x01\x01",
 		},
 		{
-			name: "legacy base64",
-			key:  "ss://" + b64url(testMethod+":legacy@198.51.100.1:8000") + "#old",
+			name:   "legacy base64",
+			key:    "ss://" + b64url(testMethod+":legacy@198.51.100.1:8000") + "#old",
 			method: testMethod, pass: "legacy", host: "198.51.100.1", port: 8000, nm: "old",
 		},
 		{
-			name: "IPv6 server",
-			key:  "ss://" + b64url(testMethod+":x") + "@[2001:db8::1]:8388",
+			name:   "IPv6 server",
+			key:    "ss://" + b64url(testMethod+":x") + "@[2001:db8::1]:8388",
 			method: testMethod, pass: "x", host: "2001:db8::1", port: 8388,
 		},
 		{
-			name: "whitespace and upper-case method",
-			key:  "  ss://" + b64url("AES-256-GCM:x") + "@1.2.3.4:1\n",
+			name:   "whitespace and upper-case method",
+			key:    "  ss://" + b64url("AES-256-GCM:x") + "@1.2.3.4:1\n",
 			method: "aes-256-gcm", pass: "x", host: "1.2.3.4", port: 1,
 		},
 	}
@@ -178,5 +178,44 @@ func TestParseSettingsErrors(t *testing.T) {
 		if err != nil && strings.Contains(err.Error(), "s3cret") {
 			t.Errorf("case %d: error leaks the password", i)
 		}
+	}
+}
+
+func TestParseAccessKeyRejectsUnknownCipher(t *testing.T) {
+	_, err := ParseAccessKey("ss://" + b64url("whacha20-ietf-poly1305:s3cret") + "@203.0.113.7:8388/?outline=1")
+	if err == nil || !strings.Contains(err.Error(), "unsupported cipher") {
+		t.Fatalf("err = %v", err)
+	}
+	if strings.Contains(err.Error(), "s3cret") {
+		t.Fatal("error leaks the password")
+	}
+}
+
+func TestRedact(t *testing.T) {
+	k, err := ParseAccessKey("ss://" + b64url(testMethod+":s3cret+/=") + "@203.0.113.7:8388")
+	if err != nil {
+		t.Fatal(err)
+	}
+	tr := k.TransportConfig(netip.MustParseAddr("203.0.113.7"), "split:2")
+	msgs := []string{
+		// Shape of the outline-sdk error seen in the journal.
+		"create stream dialer: failed to decode host string [" + tr.Stream + "]: illegal base64 data at input byte 2",
+		"dial " + tr.Packet + ": connection refused",
+		"password s3cret+/= rejected; escaped s3cret%2B%2F%3D",
+		"legacy ss://" + b64url(testMethod+":s3cret+/=@203.0.113.7:8388") + "#x",
+		"std " + base64.StdEncoding.EncodeToString([]byte(testMethod+":s3cret+/=")),
+	}
+	for _, m := range msgs {
+		got := k.Redact(m)
+		if strings.Contains(got, "s3cret") || strings.Contains(got, b64url(testMethod+":s3cret")) ||
+			strings.Contains(got, base64.StdEncoding.EncodeToString([]byte(testMethod+":s3cret+/="))) {
+			t.Errorf("not redacted: %q -> %q", m, got)
+		}
+		if !strings.Contains(got, "REDACTED") {
+			t.Errorf("no marker: %q", got)
+		}
+	}
+	if got := k.Redact("203.0.113.7:8388 timeout"); got != "203.0.113.7:8388 timeout" {
+		t.Errorf("changed unrelated text: %q", got)
 	}
 }
