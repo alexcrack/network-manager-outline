@@ -31,7 +31,7 @@ and the network applet, without the Outline client. The original goal is met.
 
 1. Phase 2, starting with `ssconf://` keys (needed by many Outline providers)
    and reconnect on network change.
-2. Phase 4: packaging, so installing does not need a source checkout.
+2. Phase 4: install-test the Debian packages, then GNOME support or a PPA.
 
 ## Roadmap
 
@@ -100,8 +100,10 @@ Goal: `nmcli connection up` works with a real `ss://` key.
 - [x] Installed: "Outline VPN" appears under Add new connection; the applet stops reporting missing support
 - [x] End-to-end on 2026-11-24: create, import, edit, connect and disconnect from System Settings and the applet. The applet's connect reached the service (journal: activation from plasmashell, tunnel up, UDP relayed, clean stop).
 
-### Phase 4: packaging and other desktops
-- [ ] Debian packages (`network-manager-outline`, `plasma-nm-outline` pinned to the plasma-nm version)
+### Phase 4: packaging and other desktops (in progress)
+- [x] Debian packages (`network-manager-outline`, `plasma-nm-outline` pinned to the plasma-nm version): `make deb`, see [packaging.md](packaging.md). Built 2026-11-24: tests pass during the build, binaries hardened (PIE, full RELRO, BIND_NOW), dependencies detected.
+- [ ] Install test of the packages on a system with the source install removed
+- [ ] Vendored Go modules and bundled plasma-nm headers, for clean-chroot builds (PPA)
 - [ ] GNOME / nm-connection-editor plugin (libnma, GTK3 and GTK4)
 - [ ] Propose the Plasma plugin upstream to plasma-nm
 

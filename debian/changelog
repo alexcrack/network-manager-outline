@@ -1,0 +1,8 @@
+network-manager-outline (0.1.0) resolute; urgency=medium
+
+  * Initial release.
+    - nm-outline-service: NetworkManager VPN service for Outline access keys,
+      built on outline-sdk.
+    - Plasma VPN plugin: settings form, key prompt and key import.
+
+ -- Alexey Avramchik <a13xcrack@gmail.com>  Tue, 24 Nov 2026 22:07:48 +0300
