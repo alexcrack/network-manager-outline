@@ -4,7 +4,9 @@ NetworkManager VPN plugin for [Outline](https://getoutline.org) built on
 [outline-sdk](https://github.com/OutlineFoundation/outline-sdk). Connect with an
 Outline access key from the system network settings, no Outline client needed.
 
-**Status: skeleton.** Builds, but nothing connects yet.
+**Status: phase 1 in progress.** The NetworkManager D-Bus layer is done and tested; the tunnel itself is not implemented yet, so nothing connects. See [docs/plan.md](docs/plan.md).
+
+Documentation: [docs/](docs/README.md).
 
 ## Architecture
 
@@ -32,6 +34,7 @@ server), DNS and teardown.
 | `plasma/` | Plasma (plasma-nm) VPN editor plugin, Qt6/KF6 |
 | `gnome/` | libnma editor plugin (phase 4) |
 | `debian/` | Packaging (phase 4) |
+| `docs/` | Plan, architecture, protocol reference |
 
 ## Building
 
@@ -62,10 +65,7 @@ nmcli connection up outline
 
 ## Roadmap
 
-1. Service + nmcli: TUN, outline-sdk device, Config/Ip4Config, UDP/DNS-truncate fallback
-2. `ssconf://` dynamic keys, IPv6 modes, reconnect on network change
-3. Plasma plugin: settings widget, secret prompt, key import
-4. Packaging, GNOME plugin, upstream to plasma-nm
+See [docs/plan.md](docs/plan.md).
 
 ## License
 
