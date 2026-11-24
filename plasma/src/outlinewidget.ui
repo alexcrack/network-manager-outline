@@ -2,47 +2,77 @@
 <ui version="4.0">
  <class>OutlineWidget</class>
  <widget class="QWidget" name="OutlineWidget">
-  <layout class="QFormLayout" name="formLayout">
-   <item row="0" column="0">
-    <widget class="QLabel" name="accessKeyLabel">
-     <property name="text"><string>Access key:</string></property>
+  <layout class="QVBoxLayout" name="mainLayout">
+   <item>
+    <widget class="QGroupBox" name="generalGroup">
+     <property name="title"><string>General</string></property>
+     <layout class="QFormLayout" name="generalLayout">
+      <item row="0" column="0">
+       <widget class="QLabel" name="accessKeyLabel">
+        <property name="text"><string>&amp;Access key:</string></property>
+        <property name="buddy"><cstring>accessKey</cstring></property>
+       </widget>
+      </item>
+      <item row="0" column="1">
+       <widget class="PasswordField" name="accessKey">
+        <property name="toolTip"><string>The ss://… or ssconf://… key from your Outline server administrator</string></property>
+       </widget>
+      </item>
+     </layout>
     </widget>
    </item>
-   <item row="0" column="1">
-    <widget class="PasswordField" name="accessKey">
-     <property name="toolTip"><string>ss://… or ssconf://… key from your Outline server admin</string></property>
+   <item>
+    <widget class="QGroupBox" name="advancedGroup">
+     <property name="title"><string>Advanced</string></property>
+     <layout class="QFormLayout" name="advancedLayout">
+      <item row="0" column="0">
+       <widget class="QLabel" name="dnsLabel">
+        <property name="text"><string>&amp;DNS servers:</string></property>
+        <property name="buddy"><cstring>dns</cstring></property>
+       </widget>
+      </item>
+      <item row="0" column="1">
+       <widget class="QLineEdit" name="dns">
+        <property name="placeholderText"><string>1.1.1.1</string></property>
+        <property name="toolTip"><string>Comma-separated IPv4 or IPv6 addresses, used through the tunnel</string></property>
+       </widget>
+      </item>
+      <item row="1" column="0">
+       <widget class="QLabel" name="ipv6Label">
+        <property name="text"><string>&amp;IPv6:</string></property>
+        <property name="buddy"><cstring>ipv6</cstring></property>
+       </widget>
+      </item>
+      <item row="1" column="1">
+       <widget class="QComboBox" name="ipv6">
+        <item><property name="text"><string>Route through the VPN</string></property></item>
+        <item><property name="text"><string>Off (IPv6 bypasses the VPN)</string></property></item>
+       </widget>
+      </item>
+      <item row="2" column="1">
+       <widget class="QCheckBox" name="neverDefault">
+        <property name="text"><string>Do &amp;not route all traffic through the VPN</string></property>
+       </widget>
+      </item>
+      <item row="3" column="0">
+       <widget class="QLabel" name="prefixLabel">
+        <property name="text"><string>&amp;Transport prefix:</string></property>
+        <property name="buddy"><cstring>transportPrefix</cstring></property>
+       </widget>
+      </item>
+      <item row="3" column="1">
+       <widget class="QLineEdit" name="transportPrefix">
+        <property name="placeholderText"><string>Optional, e.g. split:2 (TCP only)</string></property>
+        <property name="toolTip"><string>outline-sdk transport prefix applied below Shadowsocks for TCP connections, for example split:2 or tlsfrag:1</string></property>
+       </widget>
+      </item>
+     </layout>
     </widget>
    </item>
-   <item row="1" column="0">
-    <widget class="QLabel" name="dnsLabel">
-     <property name="text"><string>DNS servers:</string></property>
-    </widget>
-   </item>
-   <item row="1" column="1">
-    <widget class="QLineEdit" name="dns">
-     <property name="placeholderText"><string>1.1.1.1</string></property>
-    </widget>
-   </item>
-   <item row="2" column="0">
-    <widget class="QLabel" name="ipv6Label">
-     <property name="text"><string>IPv6:</string></property>
-    </widget>
-   </item>
-   <item row="2" column="1">
-    <widget class="QComboBox" name="ipv6">
-     <item><property name="text"><string>Route through tunnel</string></property></item>
-     <item><property name="text"><string>Off (IPv6 bypasses the VPN)</string></property></item>
-    </widget>
-   </item>
-   <item row="3" column="0">
-    <widget class="QLabel" name="prefixLabel">
-     <property name="text"><string>Transport prefix:</string></property>
-    </widget>
-   </item>
-   <item row="3" column="1">
-    <widget class="QLineEdit" name="transportPrefix">
-     <property name="placeholderText"><string>optional, e.g. split:2 (TCP only)</string></property>
-    </widget>
+   <item>
+    <spacer name="verticalSpacer">
+     <property name="orientation"><enum>Qt::Vertical</enum></property>
+    </spacer>
    </item>
   </layout>
  </widget>

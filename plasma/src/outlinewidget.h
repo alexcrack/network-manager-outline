@@ -9,6 +9,7 @@ namespace Ui
 class OutlineWidget;
 }
 
+// Settings form shown in the connection editor.
 class OutlineWidget : public SettingWidget
 {
     Q_OBJECT
@@ -22,6 +23,8 @@ public:
     bool isValid() const override;
 
 private:
+    bool dnsValid() const;
+
     Ui::OutlineWidget *const m_ui;
     NetworkManager::VpnSetting::Ptr m_setting;
 };

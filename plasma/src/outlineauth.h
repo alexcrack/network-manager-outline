@@ -9,7 +9,7 @@ namespace Ui
 class OutlineAuth;
 }
 
-// Shown by Plasma's secret agent when the access key is not stored.
+// Asks for the access key when it is not stored (Plasma's secret agent).
 class OutlineAuthWidget : public SettingWidget
 {
     Q_OBJECT
@@ -18,6 +18,7 @@ public:
     ~OutlineAuthWidget() override;
 
     QVariantMap setting() const override;
+    bool isValid() const override;
 
 private:
     Ui::OutlineAuth *const m_ui;

@@ -50,12 +50,16 @@ sudo systemctl restart NetworkManager   # first install only
 `sudo make uninstall` removes the installed files. `PREFIX` and `DESTDIR` work
 as usual.
 
-Plasma plugin (not functional yet, see [docs/plan.md](docs/plan.md)):
+Plasma plugin (adds "Outline VPN" to System Settings and the network applet):
 
 ```sh
-make plasma             # fetches plasma-nm headers matching the installed version
+make plasma             # fetches plasma-nm headers matching the installed version, builds
+make plasma-test        # loads the built plugin offscreen and tests it
 sudo make install-plasma
 ```
+
+The plugin must be rebuilt after every plasma-nm upgrade (see
+[docs/plasma-plugin.md](docs/plasma-plugin.md)).
 
 Plasma plugin build dependencies (Ubuntu):
 

@@ -16,7 +16,7 @@ BIN := bin/nm-outline-service
 
 PLASMA_NM_VERSION ?= $(shell dpkg-query -W -f='$${Version}' plasma-nm 2>/dev/null | sed -E 's/^[0-9]+://; s/-.*//')
 
-.PHONY: all service test vet plasma install install-service install-plasma uninstall clean
+.PHONY: all service test vet plasma plasma-test install install-service install-plasma uninstall clean
 
 all: service
 
@@ -33,8 +33,12 @@ plasma/third_party/plasma-nm:
 	git clone --depth 1 --branch v$(PLASMA_NM_VERSION) https://invent.kde.org/plasma/plasma-nm.git $@
 
 plasma: plasma/third_party/plasma-nm
-	cmake -S plasma -B plasma/build -DCMAKE_INSTALL_PREFIX=$(PREFIX)
+	cmake -S plasma -B plasma/build -DCMAKE_INSTALL_PREFIX=$(PREFIX) -DBUILD_TESTING=ON
 	cmake --build plasma/build
+
+# Loads the built plugin like Plasma does and exercises it offscreen.
+plasma-test: plasma
+	cd plasma/build && QT_QPA_PLATFORM=offscreen ctest --output-on-failure
 
 install: install-service
 
@@ -55,6 +59,7 @@ install-plasma:
 
 uninstall:
 	rm -f $(DESTDIR)$(LIBEXECDIR)/nm-outline-service
+	rm -f $(DESTDIR)$(PREFIX)/lib/*/qt6/plugins/plasma/network/vpn/plasmanetworkmanagement_outlineui.so
 	rm -f $(DESTDIR)$(NMVPNDIR)/nm-outline-service.name
 	rm -f $(DESTDIR)$(DBUSDIR)/nm-outline-service.conf
 
