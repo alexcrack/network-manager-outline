@@ -37,11 +37,19 @@ Goal: `nmcli connection up` works with a real `ss://` key.
    - [x] End-to-end through the real outline-sdk stack against an in-process Shadowsocks server: success, wrong password, unreachable server
    - [x] Handler flow with fake TUN/stack/emitter: reported config, `ipv6=off`, check failure, pump failure, disconnect during setup, bad settings
    - [x] TUN device test as root (skipped otherwise): `go test -c -o bin/tun.test ./internal/tun && sudo bin/tun.test -test.v`
-4. **Manual end-to-end check** (needs root and a real key)
-   - [ ] Default route through `outline0`, host route to the server via the physical link
-   - [ ] DNS through the tunnel (`resolvectl status`)
-   - [ ] TCP and UDP traffic; DNS-truncate fallback with a server without UDP
-   - [ ] `nmcli connection down` cleans up; reconnect works
+4. **Manual end-to-end check** (needs root and a real key). First run on 2026-11-24, Ubuntu 26.04, NetworkManager 1.54.3:
+   - [x] Default route through `outline0`, host route to the server via the physical link
+   - [x] DNS through the tunnel (`resolvectl status`: `1.1.1.1`, domain `~.`)
+   - [x] TCP over IPv4 and IPv6 (`curl -4/-6 https://ifconfig.me` show the server), UDP relayed (`dig`)
+   - [x] `nmcli connection down` removes `outline0`; reconnect works
+   - [ ] DNS-truncate fallback with a server without UDP
+   - [ ] Wrong password fails within about 10 s
+   - [ ] Service exits right after disconnect (fixed after the first run, see below)
+
+   Bugs found by the first run, fixed:
+   - The service treated `NM_VPN_LOG_LEVEL` being set as debug mode. NetworkManager always sets it (to a syslog level), so the service never quit after disconnect and logged at debug level. Now only `--debug` disables quitting; the level comes from the variable's value.
+   - An outline-sdk error quoted the transport config, which put the key's credentials in the journal. All logged errors are now redacted.
+   - A key with an unknown cipher failed with a confusing base64 error. The cipher is now validated when the settings are parsed, so it fails immediately with "unsupported cipher".
 
 ### Phase 2: dynamic keys and robustness
 - [ ] `ssconf://` keys (currently rejected with a clear error): fetch over HTTPS; response is an `ss://` URL or JSON (`server`, `server_port`, `password`, `method`, `prefix`)

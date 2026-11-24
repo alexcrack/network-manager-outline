@@ -142,7 +142,7 @@ func (s *session) run(ctx context.Context) {
 		if ctx.Err() != nil {
 			return // already tearing down
 		}
-		s.log.Error("tunnel failed", "step", step, "err", err)
+		s.log.Error("tunnel failed", "step", step, "err", s.st.AccessKey.Redact(err.Error()))
 		s.e.Fail(nmvpn.FailureConnectFailed)
 		<-ctx.Done()
 	}
@@ -201,7 +201,7 @@ func (s *session) run(ctx context.Context) {
 		ok, err := dev.ProbeUDP(pctx, resolver)
 		switch {
 		case err != nil:
-			s.log.Warn("UDP probe inconclusive, staying in DNS-truncate mode", "err", err)
+			s.log.Warn("UDP probe inconclusive, staying in DNS-truncate mode", "err", s.st.AccessKey.Redact(err.Error()))
 		case ok:
 			s.log.Info("server relays UDP")
 		default:

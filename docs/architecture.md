@@ -155,7 +155,19 @@ Stored in the NetworkManager connection profile. Names are defined in
 | `transport-prefix` | `vpn.data` | outline-sdk `configurl` prefix for TCP, e.g. `split:2`, `tlsfrag:1` | empty |
 
 Invalid values fail the connection with `BadArguments` before anything is
-started. Errors never include the access key.
+started, including an unsupported cipher in the key. Errors never include the
+access key: `AccessKey.Redact` removes credentials (in any `ss://` form, base64
+variant or the plain password) from every error the session logs, because
+outline-sdk errors can quote the transport config.
+
+## Logging
+
+The service logs to stderr, which NetworkManager passes to the journal
+(`journalctl -u NetworkManager`). NetworkManager always sets
+`NM_VPN_LOG_LEVEL` to its VPN log level as a syslog priority; 7 (`LOG_DEBUG`)
+enables debug messages. Timestamps are left to the journal in that case.
+`--debug` forces debug logging and keeps the service running after a
+disconnect, for running it by hand.
 
 Supported access keys: `ss://` in Outline/SIP002 form (base64url, standard
 base64 or plain userinfo), and the legacy all-base64 form, with optional

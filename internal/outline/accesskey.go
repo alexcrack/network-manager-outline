@@ -8,8 +8,11 @@ import (
 	"net"
 	"net/netip"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
+
+	"golang.getoutline.org/sdk/transport/shadowsocks"
 
 	"network-manager-outline/internal/nmvpn"
 )
@@ -75,6 +78,9 @@ func ParseAccessKey(key string) (*AccessKey, error) {
 		return nil, errors.New("access key credentials must be method:password")
 	}
 	ak.Method = strings.ToLower(ak.Method)
+	if _, err := shadowsocks.NewEncryptionKey(ak.Method, ak.Password); err != nil {
+		return nil, fmt.Errorf("access key uses an unsupported cipher %q", ak.Method)
+	}
 
 	host, port, err := net.SplitHostPort(hostport)
 	if err != nil {
@@ -102,6 +108,39 @@ func decodeBase64Lenient(s string) string {
 	}
 	if unescaped, err := url.PathUnescape(s); err == nil {
 		return unescaped
+	}
+	return s
+}
+
+// ssURL matches ss:// URLs inside error text.
+var ssURL = regexp.MustCompile(`(?i)ss://[^\s\[\]]+`)
+
+// redactSSURL hides the credentials of an ss:// URL: the userinfo in SIP002
+// form, or the whole base64 blob in legacy form.
+func redactSSURL(u string) string {
+	if at := strings.LastIndex(u, "@"); at >= 0 {
+		return "ss://REDACTED" + u[at:]
+	}
+	return "ss://REDACTED"
+}
+
+// Redact removes the key's credentials from s (typically an error message
+// from outline-sdk, which may quote the transport config).
+func (k *AccessKey) Redact(s string) string {
+	s = ssURL.ReplaceAllStringFunc(s, redactSSURL)
+	if k.Password == "" {
+		return s
+	}
+	creds := k.Method + ":" + k.Password
+	for _, secret := range []string{
+		base64.RawURLEncoding.EncodeToString([]byte(creds)),
+		base64.URLEncoding.EncodeToString([]byte(creds)),
+		base64.RawStdEncoding.EncodeToString([]byte(creds)),
+		base64.StdEncoding.EncodeToString([]byte(creds)),
+		url.QueryEscape(k.Password),
+		k.Password,
+	} {
+		s = strings.ReplaceAll(s, secret, "REDACTED")
 	}
 	return s
 }
