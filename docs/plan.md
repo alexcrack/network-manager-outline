@@ -36,7 +36,7 @@ Goal: `nmcli connection up` works with a real `ss://` key.
    - [x] Generated configurl strings accepted by outline-sdk, with and without a transport prefix
    - [x] End-to-end through the real outline-sdk stack against an in-process Shadowsocks server: success, wrong password, unreachable server
    - [x] Handler flow with fake TUN/stack/emitter: reported config, `ipv6=off`, check failure, pump failure, disconnect during setup, bad settings
-   - [ ] TUN test needs root: `sudo -E go test ./internal/tun` (skipped otherwise)
+   - [x] TUN device test as root (skipped otherwise): `go test -c -o bin/tun.test ./internal/tun && sudo bin/tun.test -test.v`
 4. **Manual end-to-end check** (needs root and a real key)
    - [ ] Default route through `outline0`, host route to the server via the physical link
    - [ ] DNS through the tunnel (`resolvectl status`)
