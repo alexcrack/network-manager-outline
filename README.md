@@ -4,7 +4,7 @@ NetworkManager VPN plugin for [Outline](https://getoutline.org) built on
 [outline-sdk](https://github.com/OutlineFoundation/outline-sdk). Connect with an
 Outline access key from the system network settings, no Outline client needed.
 
-**Status: phase 1 in progress.** The NetworkManager D-Bus layer is done and tested; the tunnel itself is not implemented yet, so nothing connects. See [docs/plan.md](docs/plan.md).
+**Status: phase 1 in progress.** The service is implemented and tested without root; it still needs a manual end-to-end test with a real server. See [docs/plan.md](docs/plan.md).
 
 Documentation: [docs/](docs/README.md).
 
@@ -55,7 +55,7 @@ sudo apt install qt6-base-dev libkf6networkmanagerqt-dev libkf6i18n-dev \
 The Plasma plugin links the internal `libplasmanm_editor.so`, which has no
 stable ABI. Rebuild after every plasma-nm upgrade.
 
-## Using it without a GUI (once phase 1 is done)
+## Using it without a GUI
 
 ```sh
 nmcli connection add type vpn vpn-type outline con-name outline \

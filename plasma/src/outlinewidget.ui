@@ -31,7 +31,7 @@
    <item row="2" column="1">
     <widget class="QComboBox" name="ipv6">
      <item><property name="text"><string>Route through tunnel</string></property></item>
-     <item><property name="text"><string>Block</string></property></item>
+     <item><property name="text"><string>Off (IPv6 bypasses the VPN)</string></property></item>
     </widget>
    </item>
    <item row="3" column="0">
@@ -41,7 +41,7 @@
    </item>
    <item row="3" column="1">
     <widget class="QLineEdit" name="transportPrefix">
-     <property name="placeholderText"><string>optional, e.g. split:2</string></property>
+     <property name="placeholderText"><string>optional, e.g. split:2 (TCP only)</string></property>
     </widget>
    </item>
   </layout>
