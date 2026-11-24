@@ -1,7 +1,7 @@
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="data/icons/outline-vpn-dark.svg">
-    <img src="data/icons/outline-vpn-light.svg" width="128" height="128" alt="Outline VPN for NetworkManager">
+    <source media="(prefers-color-scheme: dark)" srcset="data/icons/nm-outline-dark.svg">
+    <img src="data/icons/nm-outline-light.svg" width="128" height="128" alt="nm-outline">
   </picture>
 </p>
 

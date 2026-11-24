@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Generates outline-vpn.svg: the Outline circle split vertically, with half
+"""Generates nm-outline.svg: the Outline circle split vertically, with half
 of a KDE-style gear (white) on the left and a half circle in Plasma blue on
 the right.
 
-    python3 data/icons/make_icon.py > data/icons/outline-vpn.svg
+    python3 data/icons/make_icon.py > data/icons/nm-outline.svg
     python3 data/icons/make_icon.py --rotation 18 --background '#31363b' --background-radius 12
 
 `make icons` regenerates the installed icon and the README's light/dark
@@ -150,7 +150,7 @@ def main():
                       f'fill="{args.background}"/>\n')
 
     sys.stdout.write(f'''<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
-  <title>Outline VPN</title>
+  <title>nm-outline</title>
   <!-- One circle with a vertical strip cut out of the center.
        Left: half of a KDE-style gear. Right: half circle in Plasma blue. -->
 {background}  <path fill="{args.gear_color}"
