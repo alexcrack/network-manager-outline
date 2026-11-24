@@ -1,0 +1,57 @@
+Source: network-manager-outline
+Section: net
+Priority: optional
+Maintainer: Alexey Avramchik <a13xcrack@gmail.com>
+Build-Depends:
+ debhelper-compat (= 13),
+ golang-go (>= 2:1.25~),
+ cmake,
+ extra-cmake-modules,
+ pkgconf,
+ libnm-dev,
+ qt6-base-dev,
+ libkf6networkmanagerqt-dev,
+ libkf6i18n-dev,
+ libkf6coreaddons-dev,
+ libkf6widgetsaddons-dev,
+ plasma-nm,
+ dbus-daemon <!nocheck>,
+Standards-Version: 4.7.0
+Rules-Requires-Root: no
+Homepage: https://github.com/alexcrack/network-manager-outline
+Vcs-Browser: https://github.com/alexcrack/network-manager-outline
+Vcs-Git: https://github.com/alexcrack/network-manager-outline.git
+
+Package: network-manager-outline
+Architecture: linux-any
+Depends:
+ network-manager,
+ ${misc:Depends},
+ ${shlibs:Depends},
+Suggests:
+ plasma-nm-outline,
+Description: NetworkManager VPN plugin for Outline
+ Connects to Outline (Shadowsocks) servers with an Outline access key,
+ without the Outline client. The tunnel is implemented with outline-sdk and
+ managed by NetworkManager like any other VPN: routes, DNS through
+ systemd-resolved, and the connection state.
+ .
+ This package contains the VPN service. Connections can be created with
+ nmcli; install plasma-nm-outline for the KDE Plasma settings UI.
+
+Package: plasma-nm-outline
+Architecture: linux-any
+Depends:
+ network-manager-outline (= ${binary:Version}),
+ ${plasmanm:Depends},
+ ${misc:Depends},
+ ${shlibs:Depends},
+Enhances:
+ plasma-nm,
+Description: Outline VPN support for the Plasma network applet
+ Adds "Outline VPN" to the KDE Plasma network settings and lets the network
+ applet connect Outline connections. Access keys can be pasted, imported from
+ a text file, stored in KWallet, or asked for on every connect.
+ .
+ plasma-nm has no stable plugin interface, so this package works only with
+ the plasma-nm version it was built against.

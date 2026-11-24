@@ -1,0 +1,30 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: network-manager-outline
+Source: https://github.com/alexcrack/network-manager-outline
+
+Files: *
+Copyright: 2026 Alexey Avramchik
+License: Apache-2.0
+
+Files: plasma/*
+Copyright: 2026 Alexey Avramchik
+License: GPL-2+
+Comment: Links plasma-nm's editor library (GPL-2+/LGPL-2.1+). The plasma-nm
+ sources fetched into plasma/third_party at build time are used for their
+ headers only and are not shipped.
+
+License: Apache-2.0
+ Licensed under the Apache License, Version 2.0 (the "License"); you may not
+ use this file except in compliance with the License.
+ .
+ On Debian systems, the complete text of the Apache License, Version 2.0 can
+ be found in /usr/share/common-licenses/Apache-2.0.
+
+License: GPL-2+
+ This program is free software; you can redistribute it and/or modify it
+ under the terms of the GNU General Public License as published by the Free
+ Software Foundation; either version 2 of the License, or (at your option)
+ any later version.
+ .
+ On Debian systems, the complete text of the GNU General Public License
+ version 2 can be found in /usr/share/common-licenses/GPL-2.

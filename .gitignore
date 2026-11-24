@@ -3,3 +3,14 @@
 /plasma/build/
 /plasma/third_party/plasma-nm/
 *.so
+/dist/
+/obj-plasma/
+# debhelper output
+/debian/.debhelper/
+/debian/debhelper-build-stamp
+/debian/*.debhelper.log
+/debian/files
+/debian/*.substvars
+/debian/network-manager-outline/
+/debian/plasma-nm-outline/
+/debian/tmp/

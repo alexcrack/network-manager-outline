@@ -64,6 +64,20 @@ bypasses the tunnel), DNS through systemd-resolved, and clean teardown.
 
 ## Installation
 
+### As Debian packages
+
+```sh
+sudo apt install debhelper golang-go   # plus anything `dpkg-checkbuilddeps` lists
+make deb
+sudo apt install ./dist/network-manager-outline_*.deb ./dist/plasma-nm-outline_*.deb
+```
+
+This builds two packages: `network-manager-outline` (the service) and
+`plasma-nm-outline` (the Plasma plugin). See
+[docs/packaging.md](docs/packaging.md).
+
+### From source
+
 ```sh
 # Build dependencies (Ubuntu)
 sudo apt install golang gcc make cmake extra-cmake-modules libnm-dev \
@@ -86,8 +100,10 @@ everything; `PREFIX` and `DESTDIR` work as usual.
 
 > [!IMPORTANT]
 > The Plasma plugin links plasma-nm's internal editor library, which has no
-> stable ABI. Run `make plasma && sudo make install-plasma` again after every
-> plasma-nm upgrade. See [docs/plasma-plugin.md](docs/plasma-plugin.md).
+> stable ABI, so it only works with the plasma-nm version it was built for.
+> The `plasma-nm-outline` package is pinned to that version. After a plasma-nm
+> upgrade, rebuild the plugin (`make deb`, or `make plasma && sudo make
+> install-plasma`). See [docs/plasma-plugin.md](docs/plasma-plugin.md).
 
 ## Usage
 
@@ -159,7 +175,8 @@ go test -c -o bin/tun.test ./internal/tun && sudo bin/tun.test -test.v
 | `plasma/` | Plasma (plasma-nm) VPN plugin, Qt 6 / KF6 |
 | `data/` | NetworkManager `.name` file, D-Bus policy, icons |
 | `docs/` | Plan, architecture, protocol reference |
-| `gnome/`, `debian/` | Placeholders for phase 4 |
+| `debian/` | Debian packaging |
+| `gnome/` | Placeholder for GNOME support |
 
 </details>
 
@@ -169,13 +186,15 @@ go test -c -o bin/tun.test ./internal/tun && sudo bin/tun.test -test.v
 - [Architecture](docs/architecture.md): components, connection lifecycle, routing and DNS
 - [NetworkManager VPN D-Bus protocol](docs/nm-vpn-dbus-protocol.md): as implemented, verified against NetworkManager 1.54.3
 - [Plasma plugin](docs/plasma-plugin.md): how it is built and why it must be rebuilt after upgrades
+- [Packaging](docs/packaging.md): Debian packages and plasma-nm version pinning
 
 ## Roadmap
 
 - [x] Service with `nmcli`
 - [x] Plasma plugin
 - [ ] Dynamic `ssconf://` keys, reconnect on network change
-- [ ] Debian packages, GNOME support
+- [x] Debian packages
+- [ ] GNOME support, a PPA
 
 ## License
 

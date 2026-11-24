@@ -17,7 +17,7 @@ BIN := bin/nm-outline-service
 
 PLASMA_NM_VERSION ?= $(shell dpkg-query -W -f='$${Version}' plasma-nm 2>/dev/null | sed -E 's/^[0-9]+://; s/-.*//')
 
-.PHONY: all service test vet icons plasma plasma-test install install-service install-plasma uninstall clean
+.PHONY: all service test vet icons plasma plasma-test deb install install-service install-plasma uninstall clean
 
 all: service
 
@@ -49,6 +49,17 @@ plasma: plasma/third_party/plasma-nm
 plasma-test: plasma
 	cd plasma/build && QT_QPA_PLATFORM=offscreen ctest --output-on-failure
 
+# Debian packages (network-manager-outline, plasma-nm-outline) into dist/.
+# Needs debhelper and the build dependencies in debian/control
+# (`dpkg-checkbuilddeps` lists what is missing).
+DEB_VERSION = $(shell dpkg-parsechangelog -S Version 2>/dev/null)
+
+deb: plasma/third_party/plasma-nm
+	dpkg-buildpackage -us -uc -b
+	mkdir -p dist
+	mv ../network-manager-outline*_$(DEB_VERSION)_* ../plasma-nm-outline*_$(DEB_VERSION)_* dist/
+	@ls -1 dist/*.deb
+
 install: install-service
 
 install-service:
@@ -75,4 +86,4 @@ uninstall:
 	rm -f $(DESTDIR)$(ICONDIR)/nm-outline.svg
 
 clean:
-	rm -rf bin plasma/build
+	rm -rf bin plasma/build obj-plasma dist
