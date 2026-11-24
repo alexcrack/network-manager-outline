@@ -188,7 +188,8 @@ NetworkManager), agent-owned (KWallet via Plasma), or always ask.
     against an in-process Shadowsocks server and fake DNS server (success,
     wrong password, unreachable server); the connect flow with fake TUN, stack
     and emitter.
-- `sudo -E go test ./internal/tun` exercises the real TUN device (skipped
-  without CAP_NET_ADMIN).
+- The TUN test needs root and is skipped without CAP_NET_ADMIN. Build it as
+  your user and run only the binary as root (sudo's PATH has no `go`):
+  `go test -c -o bin/tun.test ./internal/tun && sudo bin/tun.test -test.v`
 - End-to-end tests need root, an installed build and a real access key; see
   phase 1 step 4 in [plan.md](plan.md).
