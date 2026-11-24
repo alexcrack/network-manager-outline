@@ -1,88 +1,183 @@
-# network-manager-outline
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="data/icons/nm-outline-dark.svg">
+    <img src="data/icons/nm-outline-light.svg" width="128" height="128" alt="nm-outline">
+  </picture>
+</p>
 
-NetworkManager VPN plugin for [Outline](https://getoutline.org) built on
-[outline-sdk](https://github.com/OutlineFoundation/outline-sdk). Connect with an
-Outline access key from the system network settings, no Outline client needed.
+<h1 align="center">network-manager-outline</h1>
 
-**Status: phase 1 in progress.** The service is implemented and tested without root; it still needs a manual end-to-end test with a real server. See [docs/plan.md](docs/plan.md).
+<p align="center">
+  Connect to <a href="https://getoutline.org">Outline</a> servers from the KDE Plasma network settings.<br>
+  No Outline client needed.
+</p>
 
-Documentation: [docs/](docs/README.md).
+<p align="center">
+  <img alt="Go 1.25" src="https://img.shields.io/badge/Go-1.25-00ADD8?logo=go&logoColor=white">
+  <img alt="NetworkManager 1.54" src="https://img.shields.io/badge/NetworkManager-1.54-1d99f3">
+  <img alt="KDE Plasma 6" src="https://img.shields.io/badge/KDE_Plasma-6-1d99f3?logo=kde&logoColor=white">
+  <img alt="outline-sdk" src="https://img.shields.io/badge/built_on-outline--sdk-5a5a5a">
+</p>
 
-## Architecture
+---
 
+A NetworkManager VPN plugin built on
+[outline-sdk](https://github.com/OutlineFoundation/outline-sdk). Paste or import
+an Outline access key, and the connection appears in System Settings and the
+network applet like any other VPN.
+
+## Features
+
+- **Native Plasma integration.** "Outline VPN" in *System Settings → Wi-Fi &
+  Networking*, connect and disconnect from the panel applet.
+- **Access keys as you get them.** Paste an `ss://` key or import a `.txt` file
+  containing one. Outline, SIP002 and legacy key formats are supported.
+- **Secure key storage.** Store the key in KWallet for your user, system-wide,
+  or be asked every time.
+- **Everything through the tunnel.** IPv4, IPv6, DNS (no leaks to other links)
+  and UDP when the server supports it, with automatic DNS-over-TCP fallback when
+  it does not.
+- **Clear errors.** A wrong key is reported as a login failure; an unreachable
+  server as a connection failure.
+- **Works with `nmcli`** too, no GUI required.
+
+## How it works
+
+```mermaid
+flowchart LR
+    UI["Plasma settings<br>and applet"] -- connection profile --> NM[NetworkManager]
+    NM -- "D-Bus" --> SVC["nm-outline-service<br>(Go, outline-sdk)"]
+    SVC -- "tunnel device, addresses, DNS" --> NM
+    SVC == "Shadowsocks" ==> OUT[("Outline server")]
 ```
-Plasma settings ──(plasma/ Qt plugin)──► NM profile (vpn.service-type=org.freedesktop.NetworkManager.outline)
-NetworkManager ──D-Bus──► nm-outline-service (Go, root)
-                              ├─ resolve access key (ss:// / ssconf://)
-                              ├─ open TUN
-                              ├─ outline-sdk lwip2transport + shadowsocks
-                              └─ report tundev / IP / DNS / server address to NM
+
+`nm-outline-service` opens a TUN device and carries its traffic through
+outline-sdk's userspace network stack to the Outline server. NetworkManager
+does the rest: addresses, routes (including a route to the server that
+bypasses the tunnel), DNS through systemd-resolved, and clean teardown.
+
+## Requirements
+
+- Linux with NetworkManager 1.54 and systemd-resolved
+- KDE Plasma 6 for the settings UI (tested on Plasma 6.6.6, Ubuntu 26.04)
+- To build: Go 1.25+, a C compiler, CMake, Qt 6 and KF6 development packages
+
+## Installation
+
+```sh
+# Build dependencies (Ubuntu)
+sudo apt install golang gcc make cmake extra-cmake-modules libnm-dev \
+    qt6-base-dev libkf6networkmanagerqt-dev libkf6i18n-dev \
+    libkf6coreaddons-dev libkf6widgetsaddons-dev
+
+# Service
+make
+sudo make install
+sudo systemctl restart NetworkManager   # first install only
+
+# Plasma plugin
+make plasma
+sudo make install-plasma
 ```
 
-NetworkManager handles addresses, routes (including the host route to the
-server), DNS and teardown.
+Build as your user and install as root: the install targets never build,
+because sudo's `PATH` usually has no `go`. `sudo make uninstall` removes
+everything; `PREFIX` and `DESTDIR` work as usual.
 
-## Layout
+> [!IMPORTANT]
+> The Plasma plugin links plasma-nm's internal editor library, which has no
+> stable ABI. Run `make plasma && sudo make install-plasma` again after every
+> plasma-nm upgrade. See [docs/plasma-plugin.md](docs/plasma-plugin.md).
+
+## Usage
+
+### In Plasma
+
+1. Open *System Settings → Wi-Fi & Networking*, click **+** and choose
+   **Outline VPN**.
+2. Paste your access key and save. Or choose **Import VPN connection…** and
+   pick a `.txt` file containing the key.
+3. Connect from the network applet in the panel.
+
+### With nmcli
+
+```sh
+read -rs KEY        # paste the key, then Enter; keeps it out of shell history
+nmcli connection add type vpn vpn-type outline con-name outline vpn.secrets "access-key=$KEY"
+unset KEY
+nmcli connection up outline
+```
+
+### Settings
+
+| Setting | Values | Default |
+|---|---|---|
+| Access key (`access-key` secret) | `ss://…` | required |
+| DNS servers (`dns`) | IPv4/IPv6 addresses, separated by commas or spaces | `1.1.1.1` |
+| IPv6 (`ipv6`) | `tunnel` (through the VPN), `off` (bypasses it) | `tunnel` |
+| Default route (`never-default`) | `yes` keeps other traffic off the VPN | `no` |
+| Transport prefix (`transport-prefix`) | outline-sdk prefix for TCP, e.g. `split:2`, `tlsfrag:1` | none |
+
+With nmcli, set them as `vpn.data`. nmcli separates items with commas, so
+separate several DNS servers with spaces:
+
+```sh
+nmcli connection modify outline vpn.data "dns=9.9.9.9 149.112.112.112, ipv6=off"
+```
+
+### Troubleshooting
+
+```sh
+journalctl -u NetworkManager -b | grep -i outline
+```
+
+The service logs each connection step. Access keys are never logged.
+
+## Development
+
+```sh
+make test          # Go tests, including D-Bus tests against a private dbus-daemon
+make plasma-test   # loads the built Plasma plugin offscreen and tests it
+make icons         # regenerates the icons from data/icons/make_icon.py
+```
+
+The TUN test needs root and is skipped otherwise:
+
+```sh
+go test -c -o bin/tun.test ./internal/tun && sudo bin/tun.test -test.v
+```
+
+<details>
+<summary>Repository layout</summary>
 
 | Path | Purpose |
 |---|---|
 | `cmd/nm-outline-service` | Service entry point |
 | `internal/nmvpn` | Pure-Go `org.freedesktop.NetworkManager.VPN.Plugin` D-Bus implementation |
-| `internal/outline` | Access-key handling, outline-sdk device, NM handler |
-| `internal/tun` | TUN device open |
-| `data/` | NM `.name` file, D-Bus policy |
-| `plasma/` | Plasma (plasma-nm) VPN editor plugin, Qt6/KF6 |
-| `gnome/` | libnma editor plugin (phase 4) |
-| `debian/` | Packaging (phase 4) |
+| `internal/outline` | Access keys, settings, outline-sdk stack, connection flow |
+| `internal/tun` | TUN device |
+| `plasma/` | Plasma (plasma-nm) VPN plugin, Qt 6 / KF6 |
+| `data/` | NetworkManager `.name` file, D-Bus policy, icons |
 | `docs/` | Plan, architecture, protocol reference |
+| `gnome/`, `debian/` | Placeholders for phase 4 |
 
-## Building
+</details>
 
-Build as your user, install as root. Install targets never build, because
-sudo's PATH usually has no `go`.
+## Documentation
 
-```sh
-make                                    # -> bin/nm-outline-service
-sudo make install                       # service, .name file, D-Bus policy
-sudo systemctl restart NetworkManager   # first install only
-```
-
-`sudo make uninstall` removes the installed files. `PREFIX` and `DESTDIR` work
-as usual.
-
-Plasma plugin (adds "Outline VPN" to System Settings and the network applet):
-
-```sh
-make plasma             # fetches plasma-nm headers matching the installed version, builds
-make plasma-test        # loads the built plugin offscreen and tests it
-sudo make install-plasma
-```
-
-The plugin must be rebuilt after every plasma-nm upgrade (see
-[docs/plasma-plugin.md](docs/plasma-plugin.md)).
-
-Plasma plugin build dependencies (Ubuntu):
-
-```sh
-sudo apt install qt6-base-dev libkf6networkmanagerqt-dev libkf6i18n-dev \
-    libkf6coreaddons-dev libkf6widgetsaddons-dev libnm-dev extra-cmake-modules
-```
-
-The Plasma plugin links the internal `libplasmanm_editor.so`, which has no
-stable ABI. Rebuild after every plasma-nm upgrade.
-
-## Using it without a GUI
-
-```sh
-nmcli connection add type vpn vpn-type outline con-name outline \
-    vpn.secrets "access-key=ss://..." vpn.data "dns=1.1.1.1"
-nmcli connection up outline
-```
+- [Plan and status](docs/plan.md): roadmap, decisions, test results
+- [Architecture](docs/architecture.md): components, connection lifecycle, routing and DNS
+- [NetworkManager VPN D-Bus protocol](docs/nm-vpn-dbus-protocol.md): as implemented, verified against NetworkManager 1.54.3
+- [Plasma plugin](docs/plasma-plugin.md): how it is built and why it must be rebuilt after upgrades
 
 ## Roadmap
 
-See [docs/plan.md](docs/plan.md).
+- [x] Service with `nmcli`
+- [x] Plasma plugin
+- [ ] Dynamic `ssconf://` keys, reconnect on network change
+- [ ] Debian packages, GNOME support
 
 ## License
 
-Service: Apache-2.0 (same as outline-sdk). Plasma plugin: GPL-2.0-or-later (links plasma-nm).
+The service is Apache-2.0, like outline-sdk. The Plasma plugin is
+GPL-2.0-or-later because it links plasma-nm.

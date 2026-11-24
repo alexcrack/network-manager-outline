@@ -3,7 +3,7 @@
         "Category": "VPNService",
         "Description": "Connect to Outline (Shadowsocks) servers using an access key",
         "EnabledByDefault": false,
-        "Icon": "",
+        "Icon": "nm-outline",
         "License": "GPL",
         "Name": "Outline VPN",
         "Version": "0.1",
