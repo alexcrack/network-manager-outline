@@ -69,7 +69,9 @@ func fakeDNS(t *testing.T) string {
 }
 
 // ssServer is a minimal Shadowsocks TCP server that sends every stream to
-// upstream, recording the requested destinations.
+// upstream, recording the requested destinations. Like outline-ss-server, it
+// does not reply to a wrong key: it drains the connection until the client
+// gives up.
 type ssServer struct {
 	addr    netip.AddrPort
 	mu      sync.Mutex
@@ -99,14 +101,15 @@ func newSSServer(t *testing.T, method, password, upstream string) *ssServer {
 				sc := ciph.StreamConn(c)
 				tgt, err := socks.ReadAddr(sc)
 				if err != nil {
-					return // wrong key: drop the connection
+					io.Copy(io.Discard, c) // wrong key: stay silent
+					return
 				}
 				s.mu.Lock()
 				s.targets = append(s.targets, tgt.String())
 				s.mu.Unlock()
 				up, err := net.Dial("tcp", upstream)
 				if err != nil {
-					return
+					return // upstream unreachable: close
 				}
 				defer up.Close()
 				go io.Copy(up, sc)
@@ -166,10 +169,36 @@ func TestDeviceCheckTCPWrongPassword(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer dev.Close()
+	if err := dev.CheckServer(context.Background()); err != nil {
+		t.Fatalf("CheckServer: %v", err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	defer cancel()
+	err = dev.CheckTCP(ctx, netip.MustParseAddr("9.9.9.9"))
+	if err == nil {
+		t.Fatal("CheckTCP succeeded with a wrong password")
+	}
+	if !IsTimeout(err) {
+		t.Fatalf("wrong key should look like a timeout (login failure), got %v", err)
+	}
+}
+
+func TestDeviceCheckTCPServerWithoutInternet(t *testing.T) {
+	ln, _ := net.Listen("tcp", "127.0.0.1:0")
+	dead := ln.Addr().String()
+	ln.Close()
+	srv := newSSServer(t, testMethod, "s3cret", dead) // right key, upstream unreachable
+	key := &AccessKey{Method: testMethod, Password: "s3cret", Host: "127.0.0.1", Port: srv.addr.Port()}
+	dev, err := NewDevice(context.Background(), key.TransportConfig(srv.addr.Addr(), ""))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer dev.Close()
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	if err := dev.CheckTCP(ctx, netip.MustParseAddr("9.9.9.9")); err == nil {
-		t.Fatal("CheckTCP succeeded with a wrong password")
+	err = dev.CheckTCP(ctx, netip.MustParseAddr("9.9.9.9"))
+	if err == nil || IsTimeout(err) {
+		t.Fatalf("want a non-timeout error when the server closes, got %v", err)
 	}
 }
 
@@ -183,6 +212,9 @@ func TestDeviceCheckTCPUnreachable(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer dev.Close()
+	if err := dev.CheckServer(context.Background()); err == nil {
+		t.Fatal("CheckServer succeeded on a closed port")
+	}
 	err = dev.CheckTCP(context.Background(), netip.MustParseAddr("9.9.9.9"))
 	if err == nil || errors.Is(err, context.DeadlineExceeded) {
 		t.Fatalf("want a fast connection error, got %v", err)

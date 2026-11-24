@@ -92,8 +92,10 @@ Connect(settings)                ─► state STARTING; Handler.Connect parses t
                                     session:
                                       1. resolve the server host (10 s), prefer IPv4
                                       2. build the outline-sdk stack with the IP, not the hostname
-                                      3. TCP check: resolve www.google.com over DNS-over-TCP
-                                         through the server (10 s); fails on wrong key/unreachable
+                                      3. checks (10 s each): plain TCP connect to the server
+                                         (fails → CONNECT_FAILED), then resolve www.google.com
+                                         over DNS-over-TCP through the server (timeout →
+                                         LOGIN_FAILED: wrong key; other error → CONNECT_FAILED)
                                       4. open TUN outline%d (MTU 1500, link up), start the pump
                                     ◄─ Config {tundev, gateway=server IP, mtu 1500, has-ip4, has-ip6}
                                     ◄─ Ip4Config {10.233.233.1/32, dns, domains ~., never-default}
@@ -110,10 +112,16 @@ Disconnect()                     ─► STOPPING; cancel ctx; session closes TUN
                                     with peer watching: quit shortly after STOPPED
 ```
 
-Any failure in the session (resolve, stack, TCP check, TUN, config, or the
+Any failure in the session (resolve, stack, checks, TUN, config, or the
 packet pump stopping later) goes through `Emitter.Fail`: the plugin emits
-`Failure(CONNECT_FAILED)` and disconnects, and NetworkManager marks the
-connection failed when it sees STOPPED. A user disconnect during setup is not
+`Failure` and disconnects, and NetworkManager marks the connection failed
+when it sees STOPPED. Only `LOGIN_FAILED` gives a specific reason in nmcli and
+Plasma; `CONNECT_FAILED` shows as "Unknown reason", so the log has the details.
+
+A wrong key is recognised by its timeout: Outline servers never answer a
+wrong key, they drain the connection until the client gives up. A server
+that accepts the key but cannot reach the internet closes the connection
+instead, which is reported as `CONNECT_FAILED`. A user disconnect during setup is not
 reported as a failure.
 
 The lwIP stack in outline-sdk is a process-wide singleton, which matches

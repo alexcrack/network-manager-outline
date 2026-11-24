@@ -158,6 +158,8 @@ type Transport struct {
 	// Packet builds the UDP listener. Prefixes are not applied: most of them
 	// (split, tlsfrag) only exist for streams.
 	Packet string
+	// Server is the Shadowsocks server address, for the reachability check.
+	Server netip.AddrPort
 }
 
 // TransportConfig returns the configurl strings for this key, dialing
@@ -175,7 +177,7 @@ func (k *AccessKey) TransportConfig(serverIP netip.Addr, prefix string) Transpor
 	if k.Prefix != "" {
 		ss.RawQuery = url.Values{"prefix": {k.Prefix}}.Encode()
 	}
-	t := Transport{Stream: ss.String(), Packet: ss.String()}
+	t := Transport{Stream: ss.String(), Packet: ss.String(), Server: netip.AddrPortFrom(serverIP.Unmap(), k.Port)}
 	if prefix = strings.Trim(strings.TrimSpace(prefix), "|"); prefix != "" {
 		t.Stream = prefix + "|" + t.Stream
 	}

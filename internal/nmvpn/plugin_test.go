@@ -16,17 +16,21 @@ import (
 
 // fakeBus records emitted signals.
 type fakeBus struct {
-	mu      sync.Mutex
-	signals []string
-	states  []ServiceState
+	mu       sync.Mutex
+	signals  []string
+	states   []ServiceState
+	failures []Failure
 }
 
 func (b *fakeBus) Emit(_ dbus.ObjectPath, name string, values ...any) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	b.signals = append(b.signals, name)
-	if name == PluginInterface+".StateChanged" {
+	switch name {
+	case PluginInterface + ".StateChanged":
 		b.states = append(b.states, ServiceState(values[0].(uint32)))
+	case PluginInterface + ".Failure":
+		b.failures = append(b.failures, Failure(values[0].(uint32)))
 	}
 	return nil
 }
@@ -214,5 +218,34 @@ func TestIdleQuit(t *testing.T) {
 	case <-p.quit:
 	case <-time.After(time.Second):
 		t.Fatal("did not quit when idle")
+	}
+}
+
+func TestFailReasonKeptDuringStarting(t *testing.T) {
+	var em Emitter
+	h := &fakeHandler{emit: func(e Emitter) { em = e }}
+	p, b := newTestPlugin(h, Options{})
+	if err := p.connect("", nil); err != nil {
+		t.Fatal(err)
+	}
+	em.Fail(FailureLoginFailed)
+	waitState(t, p, StateStopped)
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if !slices.Equal(b.failures, []Failure{FailureLoginFailed}) {
+		t.Fatalf("failures = %v, want only LOGIN_FAILED (NM keeps the last one)", b.failures)
+	}
+}
+
+func TestTimeoutStillReportsConnectFailed(t *testing.T) {
+	p, b := newTestPlugin(&fakeHandler{}, Options{ConnectTimeout: 30 * time.Millisecond})
+	if err := p.connect("", nil); err != nil {
+		t.Fatal(err)
+	}
+	waitState(t, p, StateStopped)
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if !slices.Equal(b.failures, []Failure{FailureConnectFailed}) {
+		t.Fatalf("failures = %v", b.failures)
 	}
 }

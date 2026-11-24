@@ -67,8 +67,8 @@ Goal: `nmcli connection up` works with a real `ss://` key.
    - [x] DNS through the tunnel (`resolvectl status`: `1.1.1.1`, domain `~.`)
    - [x] TCP over IPv4 and IPv6 (`curl -4/-6 https://ifconfig.me` show the server), UDP relayed (`dig`)
    - [x] `nmcli connection down` removes `outline0`; reconnect works
-   - [ ] Service exits right after disconnect (fixed in PR #4, needs a retest)
-   - [ ] Wrong password fails within about 10 s (keep the cipher valid, change only the password)
+   - [x] Service exits right after disconnect (fixed in PR #4; retested: the next connection started a new process)
+   - [x] Wrong password fails after 10 s (the check timeout; Outline servers never answer a wrong key). nmcli said "Unknown reason"; now it reports a login failure, see below.
    - [ ] Connection created with `nmcli` appears in the Plasma network applet and can be toggled there (no UI plugin needed for this)
    - [ ] DNS-truncate fallback with a server without UDP (needs such a server; optional)
 
@@ -76,6 +76,9 @@ Goal: `nmcli connection up` works with a real `ss://` key.
    - The service treated `NM_VPN_LOG_LEVEL` being set as debug mode. NetworkManager always sets it (to a syslog level), so the service never quit after disconnect and logged at debug level. Now only `--debug` disables quitting; the level comes from the variable's value.
    - An outline-sdk error quoted the transport config, which put the key's credentials in the journal. All logged errors are now redacted.
    - A key with an unknown cipher failed with a confusing base64 error. The cipher is now validated when the settings are parsed, so it fails immediately with "unsupported cipher".
+   Found by the retest, fixed:
+   - nmcli printed "Unknown reason" for a wrong key. NetworkManager only gives a specific reason for `LOGIN_FAILED`, and the service always sent `CONNECT_FAILED`, which disconnecting during STARTING sent again on top. The service now checks plain TCP reachability first, reports a timeout through Shadowsocks as `LOGIN_FAILED` (wrong key), and keeps the first reported reason.
+   - Note: the official Outline client was connected during this retest (`outline-tun1`, source address `10.0.85.5` in the log), so the check traffic went through it. Disconnect other VPNs when testing.
 5. **Install**
    - [ ] `sudo make install` fails: the install target depends on the phony `service` target, so it runs `go build` as root, and sudo's PATH has no `go`. Make install depend on the built binary instead, so `make && sudo make install` works. Until then, install by hand (see the README).
 
