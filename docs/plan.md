@@ -11,10 +11,13 @@ Target system: Ubuntu 26.04, KDE Plasma 6.6.6, NetworkManager 1.54.3.
 
 ## Status (2026-11-24)
 
-The service works end to end with `nmcli`: a real Outline server carries IPv4,
-IPv6, DNS and UDP traffic, and disconnect and reconnect are clean. A few
-phase 1 checks remain (see below). There is no settings UI yet, so connections
-are created with `nmcli`.
+Phase 1 is done: the service works end to end with `nmcli`. A real Outline
+server carries IPv4, IPv6, DNS and UDP traffic, disconnect and reconnect are
+clean, and a wrong key is reported as a login failure.
+
+Phase 3 is done: with the Plasma plugin installed, Outline connections are
+created, imported, edited, connected and disconnected from System Settings
+and the network applet, without the Outline client. The original goal is met.
 
 | PR | Contents |
 |---|---|
@@ -22,18 +25,13 @@ are created with `nmcli`.
 | #2 | Outline tunnel on outline-sdk |
 | #3 | Docs: running the TUN test as root |
 | #4 | Fixes from the first end-to-end run |
+| #5 | Wrong key reported as login failure, `sudo make install`, plan update |
 
 ## Next steps
 
-1. Finish phase 1: retest the wrong key (expect a login-failure message) with
-   other VPNs disconnected, and check the Plasma applet with a
-   `nmcli`-created connection.
-2. Phase 3 (Plasma plugin) before phase 2. The goal is connecting from the
-   system dialog, and phase 2 items are robustness work that the current
-   service can do without. Doing the UI earlier also finds out sooner whether
-   the out-of-tree plugin loads in Plasma at all (the main project risk).
-3. Phase 2, starting with `ssconf://` keys (needed by many Outline providers)
+1. Phase 2, starting with `ssconf://` keys (needed by many Outline providers)
    and reconnect on network change.
+2. Phase 4: packaging, so installing does not need a source checkout.
 
 ## Roadmap
 
@@ -42,7 +40,7 @@ are created with `nmcli`.
 - [x] NM `.name` file and D-Bus policy
 - [x] Plasma plugin scaffold (CMake, widget/auth stubs, plugin metadata)
 
-### Phase 1: service and nmcli (almost done)
+### Phase 1: service and nmcli (done)
 Goal: `nmcli connection up` works with a real `ss://` key.
 
 1. **D-Bus layer verified against libnm (done)**
@@ -70,7 +68,8 @@ Goal: `nmcli connection up` works with a real `ss://` key.
    - [x] `nmcli connection down` removes `outline0`; reconnect works
    - [x] Service exits right after disconnect (fixed in PR #4; retested: the next connection started a new process)
    - [x] Wrong password fails after 10 s (the check timeout; Outline servers never answer a wrong key). nmcli said "Unknown reason"; now it reports a login failure, see below.
-   - [ ] Connection created with `nmcli` appears in the Plasma network applet and can be toggled there (no UI plugin needed for this)
+   - [x] Wrong key retested with other VPNs disconnected: one `login-failed` in the journal, nmcli reports invalid secrets
+   - [x] Plasma applet with an `nmcli`-created connection: refuses with "Plasma is missing support for 'outline' VPN connections". plasma-nm will not even activate a VPN type without a UI plugin for it (`libs/handler.cpp`), so phase 3 is required.
    - [ ] DNS-truncate fallback with a server without UDP (needs such a server; optional)
 
    Bugs found by the first run, fixed in PR #4:
@@ -90,13 +89,16 @@ Goal: `nmcli connection up` works with a real `ss://` key.
 - [ ] Interactive secrets (`ConnectInteractive`, `SecretsRequired`, `NewSecrets`) if needed
 - [x] Logging to the journal: done in phase 1. NetworkManager passes the service's stderr to the journal, and the level follows `NM_VPN_LOG_LEVEL`.
 
-### Phase 3: Plasma plugin (next)
-- [ ] Install Qt6/KF6 dev packages (see [plasma-plugin.md](plasma-plugin.md))
-- [ ] Build against plasma-nm 6.6.6 sources and confirm Plasma loads the plugin ("Outline VPN" appears under Add connection)
-- [ ] Settings widget: load and save `vpn.data`, the access-key secret and its flags
-- [ ] Secret prompt widget
-- [ ] Import a `.txt` file or pasted `ss://` / `ssconf://` key
-- [ ] End-to-end: create, edit, connect and disconnect from Plasma System Settings and the network applet
+### Phase 3: Plasma plugin (done)
+- [x] Install Qt6/KF6 dev packages (see [plasma-plugin.md](plasma-plugin.md))
+- [x] Build against plasma-nm 6.6.6 sources; stand-in for the generated `plasmanm_editor_export.h`
+- [x] Plugin loads like Plasma loads it (offscreen test via `KPluginMetaData` + `KPluginFactory`), no unresolved symbols against the installed libraries
+- [x] Settings widget: access key with storage options (`access-key-flags`), DNS, IPv6, never-default, transport prefix; only non-default values stored
+- [x] Secret prompt widget
+- [x] Import a `.txt` file containing a key (name from `#fragment`); not `*.conf`, which OpenVPN claims
+- [x] Offscreen tests: new connection, round trip, "always ask", prompt, import, non-key file (`make plasma-test`)
+- [x] Installed: "Outline VPN" appears under Add new connection; the applet stops reporting missing support
+- [x] End-to-end on 2026-11-24: create, import, edit, connect and disconnect from System Settings and the applet. The applet's connect reached the service (journal: activation from plasmashell, tunnel up, UDP relayed, clean stop).
 
 ### Phase 4: packaging and other desktops
 - [ ] Debian packages (`network-manager-outline`, `plasma-nm-outline` pinned to the plasma-nm version)

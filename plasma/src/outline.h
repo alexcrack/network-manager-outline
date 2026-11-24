@@ -13,7 +13,7 @@ public:
     SettingWidget *askUser(const NetworkManager::VpnSetting::Ptr &setting, const QStringList &hints, QWidget *parent) override;
     QString suggestedFileName(const NetworkManager::ConnectionSettings::Ptr &connection) const override;
 
-    // Import a text file containing an ss:// or ssconf:// access key.
+    // "Import VPN connection…": a text file containing an ss:// or ssconf:// key.
     QStringList supportedFileExtensions() const override;
     ImportResult importConnectionSettings(const QString &fileName) override;
 };
