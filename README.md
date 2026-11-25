@@ -13,10 +13,17 @@
 </p>
 
 <p align="center">
+  <a href="https://launchpad.net/~a13xcrack/+archive/ubuntu/network-manager-outline"><img alt="PPA: ppa:a13xcrack/network-manager-outline" src="https://img.shields.io/badge/PPA-a13xcrack%2Fnetwork--manager--outline-E95420?logo=launchpad&logoColor=white"></a>
+  <a href="https://github.com/alexcrack/network-manager-outline/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/alexcrack/network-manager-outline?logo=github&label=release"></a>
+  <br>
   <img alt="Go 1.25" src="https://img.shields.io/badge/Go-1.25-00ADD8?logo=go&logoColor=white">
   <img alt="NetworkManager 1.54" src="https://img.shields.io/badge/NetworkManager-1.54-1d99f3">
   <img alt="KDE Plasma 6" src="https://img.shields.io/badge/KDE_Plasma-6-1d99f3?logo=kde&logoColor=white">
   <img alt="outline-sdk" src="https://img.shields.io/badge/built_on-outline--sdk-5a5a5a">
+</p>
+
+<p align="center">
+  <a href="https://launchpad.net/~a13xcrack/+archive/ubuntu/network-manager-outline"><img src="https://media.launchpad.net/lp-badge-kit/launchpad-badge-w160px.png" width="160" height="37" alt="Uses Launchpad: ppa:a13xcrack/network-manager-outline"></a>
 </p>
 
 ---
@@ -67,7 +74,35 @@ bypasses the tunnel), DNS through systemd-resolved, and clean teardown.
 
 ## Installation
 
-### As Debian packages
+### From the PPA (recommended)
+
+Packages for Ubuntu 22.04, 24.04 and 26.04 are in the Launchpad PPA
+[ppa:a13xcrack/network-manager-outline](https://launchpad.net/~a13xcrack/+archive/ubuntu/network-manager-outline):
+
+```sh
+sudo add-apt-repository ppa:a13xcrack/network-manager-outline
+
+# Ubuntu 26.04 with KDE Plasma 6: the service and the Plasma plugin
+sudo apt install network-manager-outline plasma-nm-outline
+
+# Ubuntu 22.04 and 24.04 (Plasma 5): the service only, use it with nmcli
+sudo apt install network-manager-outline
+```
+
+If "Outline VPN" doesn't show up in System Settings right away, restart
+NetworkManager (`sudo systemctl restart NetworkManager`) and reopen System
+Settings.
+
+`plasma-nm-outline` is built for one plasma-nm version (see the note below),
+so apt may hold back a plasma-nm update until a matching release is in the
+PPA.
+
+The `.deb` files are also attached to each
+[GitHub release](https://github.com/alexcrack/network-manager-outline/releases),
+with a `~ubuntu<version>` suffix (shown as `.ubuntu<version>`) for each
+Ubuntu release.
+
+### Building Debian packages yourself
 
 ```sh
 sudo apt install debhelper golang-go   # plus anything `dpkg-checkbuilddeps` lists
