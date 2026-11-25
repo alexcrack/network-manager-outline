@@ -198,5 +198,7 @@ go test -c -o bin/tun.test ./internal/tun && sudo bin/tun.test -test.v
 
 ## License
 
-The service is Apache-2.0, like outline-sdk. The Plasma plugin is
-GPL-2.0-or-later because it links plasma-nm.
+- The service and everything outside `plasma/`: [Apache License 2.0](LICENSE),
+  like outline-sdk.
+- The Plasma plugin in `plasma/`: [GNU GPL v2 or later](plasma/LICENSE),
+  because it links plasma-nm.
