@@ -4,7 +4,7 @@
 
 | Package | Contents | Depends on |
 |---|---|---|
-| `network-manager-outline` | `/usr/libexec/nm-outline-service`, the NetworkManager `.name` file, the D-Bus policy, the `nm-outline` icon | `network-manager`, libc |
+| `network-manager-outline` | `/usr/libexec/nm-outline-service`, the NetworkManager `.name` file, the D-Bus policy, the `nm-outline` icon (SVG, and PNG at 16–128 px) | `network-manager`, libc |
 | `plasma-nm-outline` | The Plasma VPN plugin | `network-manager-outline` of the same version, `plasma-nm` of the exact upstream version it was built against |
 
 ## Building
