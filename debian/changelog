@@ -1,3 +1,25 @@
+network-manager-outline (0.1.0) unstable; urgency=medium
+
+  * Stay connected when the network changes
+  * Support dynamic ssconf:// access keys
+  * Add CI: PR checks, package builds and PPA releases
+  * Render the icons as PNG at 16, 32, 64 and 128 px
+  * Add license files
+  * Add Debian packaging
+  * Rename the icons to nm-outline
+  * Add project icon and rewrite the README
+  * Implement the Plasma VPN plugin for Outline
+  * Make `sudo make install` work
+  * Report a wrong access key as a login failure
+  * Update plan with status and next steps
+  * Fix issues found by the first end-to-end test
+  * Document running the TUN test as root
+  * Implement Outline tunnel on outline-sdk
+  * Verify NM VPN D-Bus layer against libnm and add docs
+  * Initial commit
+
+ -- Alexey Avramchik <a13xcrack@gmail.com>  Wed, 25 Nov 2026 10:04:53 +0000
+
 network-manager-outline (0.1.0) resolute; urgency=medium
 
   * Initial release.
