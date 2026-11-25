@@ -68,7 +68,7 @@ func NewHandler(log *slog.Logger) *Handler {
 			return tun.Open(tun.DefaultName, MTU)
 		},
 		newStack: func(ctx context.Context, t Transport) (stack, error) {
-			return NewDevice(ctx, t)
+			return NewDevice(ctx, t, log)
 		},
 	}
 }
@@ -264,6 +264,11 @@ func (s *session) report(tundev string, serverIP netip.Addr) error {
 		MTU:     MTU,
 		HasIP4:  true,
 		HasIP6:  ipv6,
+		// The tunnel survives network changes: every connection through it
+		// dials the server anew. With vpn.persistent=yes in the profile,
+		// NetworkManager then keeps the VPN up when the network device
+		// changes and moves the route to the server to the new one.
+		CanPersist: true,
 	}); err != nil {
 		return err
 	}

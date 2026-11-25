@@ -53,8 +53,9 @@ type Device struct {
 	closeOnce sync.Once
 }
 
-// NewDevice builds the transport stack. It does no network I/O.
-func NewDevice(ctx context.Context, t Transport) (*Device, error) {
+// NewDevice builds the transport stack. It does no network I/O. log may be
+// nil; it reports traffic refused by the loop guard (see loopguard.go).
+func NewDevice(ctx context.Context, t Transport, log *slog.Logger) (*Device, error) {
 	d := &Device{server: t.Server}
 	var err error
 	if d.sd, err = configurl.New[transport.StreamDialer](ctx, registry, t.Stream); err != nil {
@@ -72,7 +73,11 @@ func NewDevice(ctx context.Context, t Transport) (*Device, error) {
 	if d.relay, err = packetrelay.NewDelegatePacketRelay(d.fallback); err != nil {
 		return nil, fmt.Errorf("create delegate relay: %w", err)
 	}
-	if d.ip, err = lwip2transport.ConfigureDeviceWithRelay(d.sd, d.relay); err != nil {
+	// Tunnel traffic goes through the loop guard; the checks (CheckServer,
+	// CheckTCP, ProbeUDP) use the dialers directly.
+	guard := &loopGuard{server: t.Server.Addr().Unmap(), log: log}
+	if d.ip, err = lwip2transport.ConfigureDeviceWithRelay(
+		guardedStreamDialer{d.sd, guard}, guardedPacketRelay{d.relay, guard}); err != nil {
 		return nil, fmt.Errorf("configure lwIP: %w", err)
 	}
 	return d, nil

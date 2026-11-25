@@ -169,7 +169,7 @@ func TestHandlerConnectReportsConfig(t *testing.T) {
 	}
 
 	g := f.em.generic
-	if g.TunDev != "outline7" || g.Gateway != netip.MustParseAddr("203.0.113.7") || g.MTU != MTU || !g.HasIP4 || !g.HasIP6 {
+	if g.TunDev != "outline7" || g.Gateway != netip.MustParseAddr("203.0.113.7") || g.MTU != MTU || !g.HasIP4 || !g.HasIP6 || !g.CanPersist {
 		t.Fatalf("generic = %+v", *g)
 	}
 	if _, err := g.Dict(); err != nil {

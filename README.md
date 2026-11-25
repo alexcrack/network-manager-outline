@@ -38,6 +38,8 @@ network applet like any other VPN.
 - **Everything through the tunnel.** IPv4, IPv6, DNS (no leaks to other links)
   and UDP when the server supports it, with automatic DNS-over-TCP fallback when
   it does not.
+- **Stays connected when you switch networks**, without leaking traffic
+  while the new network comes up.
 - **Clear errors.** A wrong key is reported as a login failure; an unreachable
   server as a connection failure.
 - **Works with `nmcli`** too, no GUI required.
@@ -134,12 +136,19 @@ nmcli connection up outline
 | IPv6 (`ipv6`) | `tunnel` (through the VPN), `off` (bypasses it) | `tunnel` |
 | Default route (`never-default`) | `yes` keeps other traffic off the VPN | `no` |
 | Transport prefix (`transport-prefix`) | outline-sdk prefix for TCP, e.g. `split:2`, `tlsfrag:1` | none |
+| Stay connected when the network changes (`vpn.persistent`, not in `vpn.data`) | `yes`, `no` | `yes` in Plasma, `no` in nmcli |
 
 With nmcli, set them as `vpn.data`. nmcli separates items with commas, so
 separate several DNS servers with spaces:
 
 ```sh
 nmcli connection modify outline vpn.data "dns=9.9.9.9 149.112.112.112, ipv6=off"
+```
+
+To stay connected when the network changes, as Plasma does by default:
+
+```sh
+nmcli connection modify outline vpn.persistent yes
 ```
 
 ### Troubleshooting
@@ -199,7 +208,7 @@ go test -c -o bin/tun.test ./internal/tun && sudo bin/tun.test -test.v
 - [x] Service with `nmcli`
 - [x] Plasma plugin
 - [x] Dynamic `ssconf://` keys
-- [ ] Reconnect on network change
+- [x] Stay connected when the network changes
 - [x] Debian packages
 - [x] CI and Launchpad PPA releases
 - [ ] GNOME support

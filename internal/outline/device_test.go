@@ -139,7 +139,7 @@ func TestDeviceCheckTCPThroughShadowsocks(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		dev, err := NewDevice(context.Background(), key.TransportConfig(ip, prefix))
+		dev, err := NewDevice(context.Background(), key.TransportConfig(ip, prefix), nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -164,7 +164,7 @@ func TestDeviceCheckTCPThroughShadowsocks(t *testing.T) {
 func TestDeviceCheckTCPWrongPassword(t *testing.T) {
 	srv := newSSServer(t, testMethod, "s3cret", fakeDNS(t))
 	key := &AccessKey{Method: testMethod, Password: "wrong", Host: "127.0.0.1", Port: srv.addr.Port()}
-	dev, err := NewDevice(context.Background(), key.TransportConfig(srv.addr.Addr(), ""))
+	dev, err := NewDevice(context.Background(), key.TransportConfig(srv.addr.Addr(), ""), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -189,7 +189,7 @@ func TestDeviceCheckTCPServerWithoutInternet(t *testing.T) {
 	ln.Close()
 	srv := newSSServer(t, testMethod, "s3cret", dead) // right key, upstream unreachable
 	key := &AccessKey{Method: testMethod, Password: "s3cret", Host: "127.0.0.1", Port: srv.addr.Port()}
-	dev, err := NewDevice(context.Background(), key.TransportConfig(srv.addr.Addr(), ""))
+	dev, err := NewDevice(context.Background(), key.TransportConfig(srv.addr.Addr(), ""), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -207,7 +207,7 @@ func TestDeviceCheckTCPUnreachable(t *testing.T) {
 	port := netip.MustParseAddrPort(ln.Addr().String()).Port()
 	ln.Close() // nothing listens here now
 	key := &AccessKey{Method: testMethod, Password: "x", Host: "127.0.0.1", Port: port}
-	dev, err := NewDevice(context.Background(), key.TransportConfig(netip.MustParseAddr("127.0.0.1"), ""))
+	dev, err := NewDevice(context.Background(), key.TransportConfig(netip.MustParseAddr("127.0.0.1"), ""), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
