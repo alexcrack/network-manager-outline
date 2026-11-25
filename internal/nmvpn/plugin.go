@@ -169,7 +169,7 @@ func (p *Plugin) Serve(ctx context.Context, conn *dbus.Conn) error {
 	if reply != dbus.RequestNameReplyPrimaryOwner {
 		return fmt.Errorf("bus name already taken: %s", p.opts.BusName)
 	}
-	defer conn.ReleaseName(p.opts.BusName)
+	defer func() { _, _ = conn.ReleaseName(p.opts.BusName) }()
 	p.log.Info("plugin ready", "name", p.opts.BusName)
 
 	p.mu.Lock()
@@ -267,7 +267,7 @@ func (p *Plugin) disconnect() error {
 		// Unlike libnm, keep a reason the handler already reported:
 		// NM keeps only the last one, and LOGIN_FAILED is more useful.
 		if !p.failed {
-			p.emitLocked("Failure", uint32(FailureConnectFailed))
+			p.signalLocked("Failure", uint32(FailureConnectFailed))
 		}
 	}
 	p.setStateLocked(StateStopping)
@@ -315,7 +315,7 @@ func (p *Plugin) SetIP6Config(c IPConfig) error {
 func (p *Plugin) Fail(f Failure) {
 	p.mu.Lock()
 	p.failed = true
-	p.emitLocked("Failure", uint32(f))
+	p.signalLocked("Failure", uint32(f))
 	p.mu.Unlock()
 	go func() {
 		if err := p.disconnect(); err != nil {
@@ -374,7 +374,7 @@ func (p *Plugin) setStateLocked(s ServiceState) {
 	if p.props != nil {
 		p.props.SetMust(PluginInterface, "State", uint32(s))
 	}
-	p.emitLocked("StateChanged", uint32(s))
+	p.signalLocked("StateChanged", uint32(s))
 
 	switch s {
 	case StateStarting:
@@ -400,6 +400,13 @@ func (p *Plugin) scheduleQuitLocked() {
 			p.log.Info("idle timeout, quitting")
 			p.Quit()
 		})
+	}
+}
+
+// signalLocked emits a signal whose failure the caller cannot act on; it is logged.
+func (p *Plugin) signalLocked(name string, args ...any) {
+	if err := p.emitLocked(name, args...); err != nil {
+		p.log.Warn("emit signal", "signal", name, "err", err)
 	}
 }
 
@@ -463,7 +470,11 @@ func (p *Plugin) peerVanished(name string) {
 	p.mu.Unlock()
 	if match {
 		p.log.Warn("peer vanished, disconnecting", "peer", name)
-		go p.disconnect()
+		go func() {
+			if err := p.disconnect(); err != nil {
+				p.log.Debug("disconnect after peer vanished", "err", err)
+			}
+		}()
 	}
 }
 

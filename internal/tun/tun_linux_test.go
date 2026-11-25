@@ -13,6 +13,9 @@ func TestOpen(t *testing.T) {
 	if errors.Is(err, unix.EPERM) || errors.Is(err, unix.EACCES) {
 		t.Skip("needs CAP_NET_ADMIN:", err)
 	}
+	if errors.Is(err, unix.ENOENT) {
+		t.Skip("no /dev/net/tun (container or build chroot):", err)
+	}
 	if err != nil {
 		t.Fatal(err)
 	}

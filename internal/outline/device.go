@@ -141,10 +141,9 @@ func (d *Device) Pump(tun io.ReadWriter, log *slog.Logger) error {
 		log.Debug("lwIP -> tun stopped", "bytes", n, "err", err)
 		errc <- fmt.Errorf("lwIP -> tun: %w", orEOF(err))
 	}()
-	err := <-errc
-	// The caller closes tun and the device, which ends the other direction.
-	go func() { <-errc }()
-	return err
+	// errc holds both results, so the other direction never blocks when it
+	// ends after the caller closes tun and the device.
+	return <-errc
 }
 
 // Close shuts down the lwIP stack.

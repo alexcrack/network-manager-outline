@@ -1,0 +1,140 @@
+name: Publish release
+run-name: Publish ${{ inputs.tag }}${{ inputs.dry_run && ' (dry run)' || '' }}
+
+# Started by hand by a release manager (repository variable RELEASE_MANAGERS)
+# once the draft release made by Prepare release has been read. It:
+# 1. downloads the release's source packages (one per Ubuntu release) and
+#    checks them against GitHub's digests and the release's SHA256SUMS;
+# 2. signs them with the Launchpad key (secrets LAUNCHPAD_GPG_PRIVATE_KEY,
+#    LAUNCHPAD_GPG_PASSPHRASE) and uploads them to the PPA (variable PPA,
+#    e.g. owner/network-manager-outline), where Launchpad builds them;
+# 3. publishes the draft release.
+# Builds nothing: the files are the GitHub release's. A dry run (the default)
+# does the checks and the signing, and shows what would be uploaded.
+# See docs/ci.md.
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag, e.g. v0.2.0'
+        type: string
+        required: true
+      dry_run:
+        description: 'Dry run: check and sign, upload and publish nothing'
+        type: boolean
+        default: true
+
+# One at a time, never cancelled half way through the uploads.
+concurrency:
+  group: publish-release
+  cancel-in-progress: false
+
+permissions:
+  contents: write # publish the draft release
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  TAG: ${{ inputs.tag }}
+  DRY_RUN: ${{ inputs.dry_run }}
+  GH_TOKEN: ${{ github.token }}
+  GH_REPO: ${{ github.repository }}
+  PPA: ${{ vars.PPA }}
+
+jobs:
+  publish:
+    name: Publish ${{ inputs.tag }}
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check the release
+        id: release
+        env:
+          MANAGERS: ${{ vars.RELEASE_MANAGERS }}
+        run: |
+          [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::'$TAG' isn't a release tag vA.B.C"; exit 1; }
+          [ -n "$MANAGERS" ] || { echo "::error::Set the repository variable RELEASE_MANAGERS (GitHub logins, space-separated) first"; exit 1; }
+          [[ " $MANAGERS " == *" $GITHUB_ACTOR "* ]] || { echo "::error::$GITHUB_ACTOR isn't a release manager (RELEASE_MANAGERS: $MANAGERS)"; exit 1; }
+          [[ "$PPA" =~ ^[a-z0-9.+-]+/[a-z0-9.+-]+$ ]] || { echo "::error::Set the repository variable PPA (owner/name, e.g. alexcrack/network-manager-outline)"; exit 1; }
+
+          gh release view "$TAG" --json isDraft,name,apiUrl > release.json || { echo "::error::No GitHub release $TAG: run Prepare release first"; exit 1; }
+          api=$(jq -r .apiUrl release.json)
+          { echo "draft=$(jq -r .isDraft release.json)"; echo "api=repos/$GITHUB_REPOSITORY/releases/${api##*/}"; } >> "$GITHUB_OUTPUT"
+          echo "$(jq -r .name release.json)$([ "$(jq -r .isDraft release.json)" = true ] && echo ' (draft)')" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Download the source packages
+        env:
+          API: ${{ steps.release.outputs.api }}
+        run: |
+          mkdir upload && cd upload
+          gh release download "$TAG" --pattern '*.dsc' --pattern '*.tar.xz' \
+            --pattern '*_source.changes' --pattern '*_source.buildinfo' --pattern SHA256SUMS
+          # Byte for byte what the release has: GitHub's digest of each file...
+          gh api "$API" --jq '.assets[] | select(.name | test("\\.dsc$|\\.tar\\.xz$|_source\\.(changes|buildinfo)$")) | "\(.digest | sub("^sha256:"; ""))  \(.name)"' > ../digests.txt
+          sha256sum --check --strict ../digests.txt
+          # ...and what the release's checksums say.
+          sha256sum --check --strict --ignore-missing SHA256SUMS
+
+          version=${TAG#v}
+          shopt -s nullglob
+          changes=(*_source.changes)
+          [ ${#changes[@]} -gt 0 ] || { echo "::error::$TAG has no source packages"; exit 1; }
+          for c in "${changes[@]}"; do
+            v=$(sed -n 's/^Version: //p' "$c")
+            [[ "$v" == "$version~ubuntu"* ]] || { echo "::error::$c has version $v, not $version~ubuntu*"; exit 1; }
+            echo "- $(sed -n 's/^Distribution: //p' "$c"): \`$v\`" >> "$GITHUB_STEP_SUMMARY"
+          done
+
+      - name: Sign
+        env:
+          GPG_KEY: ${{ secrets.LAUNCHPAD_GPG_PRIVATE_KEY }}
+          GPG_PASSPHRASE: ${{ secrets.LAUNCHPAD_GPG_PASSPHRASE }}
+        run: |
+          [ -n "$GPG_KEY" ] || { echo "::error::Set the secret LAUNCHPAD_GPG_PRIVATE_KEY (see docs/ci.md)"; exit 1; }
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends devscripts dput gnupg >/dev/null
+
+          export GNUPGHOME="$RUNNER_TEMP/gnupg"
+          mkdir -m 700 "$GNUPGHOME"
+          printf '%s' "$GPG_PASSPHRASE" > "$GNUPGHOME/passphrase"
+          # debsign runs gpg itself: unattended signing through gpg.conf.
+          printf 'batch\npinentry-mode loopback\npassphrase-file %s\n' "$GNUPGHOME/passphrase" > "$GNUPGHOME/gpg.conf"
+          printf '%s\n' "$GPG_KEY" | gpg --import
+          fpr=$(gpg --list-secret-keys --with-colons | awk -F: '/^fpr/ { print $10; exit }')
+          # Our own key: trust it, or dput's signature check rejects the uploads.
+          echo "$fpr:6:" | gpg --import-ownertrust
+          echo "Signing with key $fpr" >> "$GITHUB_STEP_SUMMARY"
+
+          cd upload
+          for c in *_source.changes; do
+            debsign --no-conf -k"$fpr" "$c"
+          done
+          echo "GNUPGHOME=$GNUPGHOME" >> "$GITHUB_ENV"
+
+      - name: Upload to the PPA
+        run: |
+          cd upload
+          for c in *_source.changes; do
+            if [ "$DRY_RUN" = true ]; then
+              echo "dry run: would upload $c to ppa:$PPA" | tee -a "$GITHUB_STEP_SUMMARY"
+            else
+              dput "ppa:$PPA" "$c"
+              echo "Uploaded $c to ppa:$PPA" >> "$GITHUB_STEP_SUMMARY"
+            fi
+          done
+
+      - name: Publish the release
+        if: steps.release.outputs.draft == 'true'
+        run: |
+          if [ "$DRY_RUN" = true ]; then
+            echo "dry run: would publish $TAG as the latest release" | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          gh release edit "$TAG" --draft=false --latest
+          echo "Published $TAG. Launchpad builds the packages: https://launchpad.net/~${PPA%%/*}/+archive/ubuntu/${PPA#*/}/+packages" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Remove the key
+        if: always()
+        run: rm -rf "${GNUPGHOME:-$RUNNER_TEMP/gnupg}"

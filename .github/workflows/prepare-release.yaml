@@ -1,0 +1,188 @@
+name: Prepare release
+run-name: Prepare release on ${{ github.ref_name }}${{ inputs.dry_run && ' (dry run)' || '' }}
+
+# Started by hand (Actions → Prepare release → Run workflow) on a release/A.B
+# branch, which is made by hand. It:
+# 1. works out the version: vA.B.0 for the branch's first release, then the
+#    next patch (or the version given);
+# 2. writes the release notes: the commits since the previous release (for
+#    A.B.0, since this branch left the previous release's line);
+# 3. adds the debian/changelog entry (the packages' version comes from it),
+#    commits it to the branch and tags that commit vA.B.C;
+# 4. builds the packages for every Ubuntu release (build.yaml) and creates a
+#    draft GitHub release with them, their source packages and SHA256SUMS.
+# Publish release (publish-release.yaml) then uploads them to the PPA and
+# publishes the draft. With "dry run" it only shows the version and the notes.
+# See docs/ci.md.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version A.B.C, matching the branch; empty: the next one'
+        type: string
+        default: ''
+      dry_run:
+        description: 'Dry run: only show the version and the notes'
+        type: boolean
+        default: false
+
+# One release at a time.
+concurrency:
+  group: prepare-release
+  cancel-in-progress: false
+
+permissions:
+  contents: write # the changelog commit, the tag and the draft release
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  prepare:
+    name: Version and notes
+    runs-on: ubuntu-24.04
+    outputs:
+      tag: ${{ steps.next.outputs.tag }}
+      version: ${{ steps.next.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Next version
+        id: next
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          [[ "$GITHUB_REF_NAME" =~ ^release/([0-9]+)\.([0-9]+)$ ]] || {
+            echo "::error::Run Prepare release on a release/A.B branch, not $GITHUB_REF_NAME"; exit 1; }
+          series="${BASH_REMATCH[1]}.${BASH_REMATCH[2]}"
+          if [ -n "$VERSION" ]; then
+            [[ "$VERSION" =~ ^${series//./\\.}\.[0-9]+$ ]] || {
+              echo "::error::Version $VERSION doesn't match the branch: expected $series.C"; exit 1; }
+          else
+            last=$(git tag -l "v$series.*" --sort=-v:refname | grep -E "^v${series//./\\.}\.[0-9]+$" | head -1 || true)
+            VERSION="$series.$(( ${last:+${last##*.} + 1} + 0 ))"
+          fi
+          tag="v$VERSION"
+          if git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
+            echo "::error::$tag already exists"; exit 1
+          fi
+          # The previous release: the highest vX.Y.Z below this one.
+          prev=$( { git tag -l 'v[0-9]*'; echo "$tag"; } | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | grep -B1 -x "$tag" | grep -vx "$tag" || true)
+          { echo "tag=$tag"; echo "version=$VERSION"; echo "prev=$prev"; } | tee -a "$GITHUB_OUTPUT"
+
+      - name: Release notes and changelog entry
+        env:
+          TAG: ${{ steps.next.outputs.tag }}
+          VERSION: ${{ steps.next.outputs.version }}
+          PREV: ${{ steps.next.outputs.prev }}
+          PPA: ${{ vars.PPA || 'OWNER/PPA' }}
+        run: |
+          # Since the previous release's line: for A.B.0 the previous release
+          # is on another branch, so start where the two lines split.
+          range=HEAD
+          [ -n "$PREV" ] && range="$(git merge-base "$PREV" HEAD)..HEAD"
+          git log --no-merges --format='%s' "$range" | grep -vE '^Release v[0-9]' > notes.txt || true
+          [ -s notes.txt ] || echo "No changes" > notes.txt
+
+          maintainer=$(sed -n 's/^ -- \(.*\)  .*$/\1/p' debian/changelog | head -1)
+          {
+            echo "network-manager-outline ($VERSION) unstable; urgency=medium"
+            echo
+            sed 's/^/  * /' notes.txt
+            echo
+            echo " -- $maintainer  $(date -R)"
+            echo
+            cat debian/changelog
+          } > changelog.new
+          mv changelog.new debian/changelog
+
+          {
+            echo "## Changes"
+            echo
+            sed 's/^/- /' notes.txt
+            echo
+            echo "## Install"
+            echo
+            echo "From the PPA (Ubuntu 22.04, 24.04, 26.04):"
+            echo
+            echo '```sh'
+            echo "sudo add-apt-repository ppa:$PPA"
+            echo "sudo apt install network-manager-outline plasma-nm-outline   # plasma-nm-outline: 26.04 only"
+            echo '```'
+            echo
+            echo "Or download the \`.deb\` files for your Ubuntu release below (\`~ubuntu22.04\`, \`~ubuntu24.04\`, \`~ubuntu26.04\`)."
+          } > release-notes.md
+
+          {
+            echo "# $TAG"
+            echo
+            echo "- Commit: \`$(git rev-parse --short HEAD)\` on \`$GITHUB_REF_NAME\`"
+            echo "- Notes since: \`${PREV:-the beginning}\`"
+            echo
+            cat release-notes.md
+            echo
+            echo "### debian/changelog entry"
+            echo
+            echo '```'
+            sed -n '1,/^ -- /p' debian/changelog
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release-notes
+          path: release-notes.md
+
+      - name: Commit and tag
+        if: ${{ !inputs.dry_run }}
+        env:
+          TAG: ${{ steps.next.outputs.tag }}
+          VERSION: ${{ steps.next.outputs.version }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898299+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Release $TAG" debian/changelog
+          git push origin "HEAD:refs/heads/$GITHUB_REF_NAME"
+          git tag -a "$TAG" -m "network-manager-outline $VERSION"
+          git push origin "refs/tags/$TAG"
+
+  build:
+    name: Build
+    needs: [ prepare ]
+    if: ${{ !inputs.dry_run }}
+    uses: ./.github/workflows/build.yaml
+    with:
+      ref: refs/tags/${{ needs.prepare.outputs.tag }}
+      release: true
+
+  draft:
+    name: Draft release
+    needs: [ prepare, build ]
+    runs-on: ubuntu-24.04
+    env:
+      TAG: ${{ needs.prepare.outputs.tag }}
+      VERSION: ${{ needs.prepare.outputs.version }}
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: deb-*
+          merge-multiple: true
+          path: dist
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: release-notes
+
+      - name: Create the draft release
+        run: |
+          (cd dist && sha256sum -- * > SHA256SUMS && cat SHA256SUMS)
+          gh release create "$TAG" --draft --verify-tag \
+            --title "network-manager-outline $VERSION" \
+            --notes-file release-notes.md dist/*
+          echo "Draft release $TAG created; run Publish release to upload it to the PPA." >> "$GITHUB_STEP_SUMMARY"

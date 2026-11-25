@@ -151,7 +151,11 @@ The service logs each connection step. Access keys are never logged.
 
 ## Development
 
+Pull requests are checked by CI (lint and tests); packages, releases and the
+Launchpad PPA are made by manual workflows. See [docs/ci.md](docs/ci.md).
+
 ```sh
+make lint          # golangci-lint, as in the PR check
 make test          # Go tests, including D-Bus tests against a private dbus-daemon
 make plasma-test   # loads the built Plasma plugin offscreen and tests it
 make icons         # regenerates the SVG and PNG icons (needs inkscape for the PNGs)
@@ -187,6 +191,7 @@ go test -c -o bin/tun.test ./internal/tun && sudo bin/tun.test -test.v
 - [NetworkManager VPN D-Bus protocol](docs/nm-vpn-dbus-protocol.md): as implemented, verified against NetworkManager 1.54.3
 - [Plasma plugin](docs/plasma-plugin.md): how it is built and why it must be rebuilt after upgrades
 - [Packaging](docs/packaging.md): Debian packages and plasma-nm version pinning
+- [CI and releases](docs/ci.md): workflows, release process, Launchpad PPA setup
 
 ## Roadmap
 
@@ -194,7 +199,8 @@ go test -c -o bin/tun.test ./internal/tun && sudo bin/tun.test -test.v
 - [x] Plasma plugin
 - [ ] Dynamic `ssconf://` keys, reconnect on network change
 - [x] Debian packages
-- [ ] GNOME support, a PPA
+- [x] CI and Launchpad PPA releases
+- [ ] GNOME support
 
 ## License
 

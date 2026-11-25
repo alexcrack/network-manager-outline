@@ -1,0 +1,66 @@
+name: Check PR
+run-name: Check PR \#${{ github.event.pull_request.number }} by ${{ github.actor }}
+
+# Checks the code of each pull request:
+# - Go: golangci-lint (.golangci.yml: gofmt, go vet, staticcheck, errcheck, ...);
+# - tests: the Go tests (with the race detector, D-Bus tests against a private
+#   dbus-daemon) and the Plasma plugin's offscreen tests, on Ubuntu 26.04, the
+#   only release with Plasma 6.
+# The packages for every Ubuntu release are built by Build (build.yaml), by hand.
+
+on:
+  pull_request:
+    branches:
+      - master
+      - 'release/**'
+
+concurrency:
+  group: check-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: Lint Go
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v9
+        with:
+          version: v2.15.0
+
+  test:
+    name: Test (Ubuntu 26.04)
+    runs-on: ubuntu-24.04
+    container: ubuntu:26.04
+    env:
+      DEBIAN_FRONTEND: noninteractive
+    steps:
+      # Before checkout: without git it downloads a tarball and the tests
+      # that use git (none yet) or `make plasma` (git clone) would fail.
+      - name: Install dependencies
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            ca-certificates git make gcc g++ libc6-dev golang-go dbus-daemon \
+            cmake extra-cmake-modules pkgconf libnm-dev qt6-base-dev \
+            libkf6networkmanagerqt-dev libkf6i18n-dev libkf6coreaddons-dev \
+            libkf6widgetsaddons-dev plasma-nm
+
+      - uses: actions/checkout@v7
+
+      - name: Go tests
+        run: go test -race ./...
+
+      - name: Plasma plugin tests
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          make plasma-test
