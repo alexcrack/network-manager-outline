@@ -74,8 +74,30 @@ jobs:
           # Byte for byte what the release has: GitHub's digest of each file...
           gh api "$API" --jq '.assets[] | select(.name | test("\\.dsc$|\\.tar\\.xz$|_source\\.(changes|buildinfo)$")) | "\(.digest | sub("^sha256:"; ""))  \(.name)"' > ../digests.txt
           sha256sum --check --strict ../digests.txt
-          # ...and what the release's checksums say.
-          sha256sum --check --strict --ignore-missing SHA256SUMS
+          # ...and what the release's checksums say. GitHub stores asset names
+          # with "~" replaced by "."; older releases list the original names.
+          sed 's/~/./g' SHA256SUMS > ../sums.txt
+          grep -E '\.dsc$|\.tar\.xz$|_source\.(changes|buildinfo)$' ../sums.txt > ../source-sums.txt
+          sha256sum --check --strict ../source-sums.txt
+          [ "$(wc -l < ../source-sums.txt)" -eq "$(wc -l < ../digests.txt)" ] || {
+            echo "::error::SHA256SUMS and the release's source files differ"; exit 1; }
+
+          # Back to the Debian file names, which the .changes and .dsc files
+          # refer to (e.g. 0.2.0~ubuntu24.04.1): each _source.changes lists
+          # the name and SHA-256 of every file of its upload.
+          declare -A by_hash
+          for f in *; do by_hash[$(sha256sum "$f" | cut -d' ' -f1)]=$f; done
+          for c in *_source.changes; do
+            while read -r hash _ name; do
+              f=${by_hash[$hash]:-}
+              [ -n "$f" ] || { echo "::error::$c lists $name, which the release doesn't have"; exit 1; }
+              [ "$f" = "$name" ] || mv -- "$f" "$name"
+            done < <(awk '/^Checksums-Sha256:/ { on = 1; next } /^[^ ]/ { on = 0 } on { print $1, $2, $3 }' "$c")
+            name="$(sed -n 's/^Source: //p' "$c")_$(sed -n 's/^Version: //p' "$c")_source.changes"
+            [ "$c" = "$name" ] || mv -- "$c" "$name"
+          done
+          rm -f SHA256SUMS
+          ls -l
 
           version=${TAG#v}
           shopt -s nullglob
