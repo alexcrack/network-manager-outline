@@ -1,0 +1,15 @@
+# golangci-lint v2 configuration, used by the PR check (.github/workflows/check-pr.yaml).
+version: "2"
+
+linters:
+  # The default set: errcheck, govet, ineffassign, staticcheck, unused.
+  default: standard
+  exclusions:
+    # Unchecked errors from Close, Flush, print functions and similar, where
+    # ignoring them is idiomatic (mostly cleanup paths).
+    presets:
+      - std-error-handling
+
+formatters:
+  enable:
+    - gofmt

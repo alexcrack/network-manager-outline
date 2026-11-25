@@ -1,0 +1,90 @@
+name: Build
+run-name: Build ${{ inputs.ref || github.ref_name }} by ${{ github.actor }}
+
+# Builds the Debian packages for each supported Ubuntu release, in a clean
+# container of that release, and keeps them as this run's artifacts
+# (deb-<series>). Publishes nothing.
+#
+# For each release, tools/deb-series.py makes the source package (vendored Go
+# modules, bundled plasma-nm headers, release-specific debian/control and
+# version, see docs/packaging.md); then the binaries are built from that
+# .dsc with only its build dependencies installed, like Launchpad does. So
+# this also checks what Publish release uploads to the PPA.
+#
+# Started by hand (Actions → Build → Run workflow) for any branch: versions
+# get a +git<date>.<commit> suffix. Called by Prepare release for a release tag.
+
+on:
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      ref:
+        description: 'What to check out, e.g. refs/tags/v0.2.0; empty: the commit the run is for'
+        type: string
+        default: ''
+      release:
+        description: 'Release build: the version from debian/changelog, without a +git suffix'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build:
+    name: Ubuntu ${{ matrix.version }}
+    runs-on: ubuntu-24.04
+    container: ubuntu:${{ matrix.version }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Go 1.25 is golang-1.25-go in -updates on 22.04 and 24.04.
+          # Plasma 6 (and so plasma-nm-outline) only on 26.04.
+          - { series: jammy, version: '22.04', go: golang-1.25-go }
+          - { series: noble, version: '24.04', go: golang-1.25-go }
+          - { series: resolute, version: '26.04', go: golang-go }
+    env:
+      DEBIAN_FRONTEND: noninteractive
+    steps:
+      - name: Install packaging tools
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            ca-certificates git python3 make dpkg-dev debhelper fakeroot ${{ matrix.go }}
+
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref }}
+          # --snapshot names the commit and its date.
+          fetch-depth: 0
+
+      - name: Source package
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          python3 tools/deb-series.py --series ${{ matrix.series }} --source-only --out dist \
+            ${{ !inputs.release && '--snapshot' || '' }}
+
+      - name: Binary packages (from the source package)
+        run: |
+          mkdir -p build/binary && cd build/binary
+          dpkg-source -x "$GITHUB_WORKSPACE"/dist/*.dsc tree
+          cd tree
+          apt-get build-dep -y --no-install-recommends .
+          dpkg-buildpackage -b -us -uc
+          cd ..
+          shopt -s nullglob
+          debs=(./*.deb)
+          [ ${#debs[@]} -gt 0 ] || { echo "::error::no .deb was built"; exit 1; }
+          mv ./*.deb ./*.ddeb ./*_amd64.buildinfo ./*_amd64.changes "$GITHUB_WORKSPACE/dist/"
+          ls -l "$GITHUB_WORKSPACE/dist"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: deb-${{ matrix.series }}
+          path: dist/*
+          if-no-files-found: error

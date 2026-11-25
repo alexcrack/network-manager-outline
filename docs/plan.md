@@ -103,7 +103,9 @@ Goal: `nmcli connection up` works with a real `ss://` key.
 ### Phase 4: packaging and other desktops (in progress)
 - [x] Debian packages (`network-manager-outline`, `plasma-nm-outline` pinned to the plasma-nm version): `make deb`, see [packaging.md](packaging.md). Built 2026-11-24: tests pass during the build, binaries hardened (PIE, full RELRO, BIND_NOW), dependencies detected.
 - [ ] Install test of the packages on a system with the source install removed
-- [ ] Vendored Go modules and bundled plasma-nm headers, for clean-chroot builds (PPA)
+- [x] Vendored Go modules and bundled plasma-nm headers, for clean-chroot builds (PPA): `tools/deb-series.py`, checked by building all three releases offline in clean containers
+- [x] CI: Check PR (lint, tests), Build (Ubuntu 22.04, 24.04, 26.04), Prepare release (release/A.B → vA.B.C, draft GitHub release), Publish release (Launchpad PPA). See [ci.md](ci.md).
+- [ ] First release through the PPA (needs the Launchpad setup in [ci.md](ci.md#one-time-setup))
 - [ ] GNOME / nm-connection-editor plugin (libnma, GTK3 and GTK4)
 - [ ] Propose the Plasma plugin upstream to plasma-nm
 

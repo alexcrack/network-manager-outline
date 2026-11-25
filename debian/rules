@@ -1,24 +1,43 @@
 #!/usr/bin/make -f
-# Builds two packages from one tree:
+# Builds up to two packages from one tree:
 #   network-manager-outline  Go service, NetworkManager .name file, D-Bus policy, icon
-#   plasma-nm-outline        Plasma VPN plugin (CMake, in plasma/)
+#   plasma-nm-outline        Plasma VPN plugin (CMake, in plasma/), only when
+#                            debian/control lists it (Plasma 6: Ubuntu 26.04+)
 #
-# Use `make deb` in the top directory: it fetches the plasma-nm headers this
-# build needs (plasma/third_party/plasma-nm) and collects the results in dist/.
-# Go modules come from the module cache or the network (GOPROXY).
+# Locally, use `make deb`: it fetches the plasma-nm headers this build needs
+# (plasma/third_party/plasma-nm) and collects the results in dist/. For Ubuntu
+# releases and the PPA, tools/deb-series.py prepares a per-release source tree
+# with vendored Go modules and bundled plasma-nm headers, so the build needs
+# no network (Launchpad builders have none).
 
 export DEB_BUILD_MAINT_OPTIONS = hardening=+all
 DPKG_EXPORT_BUILDFLAGS = 1
 include /usr/share/dpkg/buildflags.mk
 
 # Go: hardened cgo flags, position-independent executable, reproducible paths,
-# never download a different toolchain, never edit go.mod.
+# never download a different toolchain. Vendored modules when present (source
+# packages), otherwise the module cache, never editing go.mod.
 export CGO_CFLAGS   := $(CFLAGS) $(CPPFLAGS)
 export CGO_CXXFLAGS := $(CXXFLAGS) $(CPPFLAGS)
 export CGO_LDFLAGS  := $(LDFLAGS)
-export GOFLAGS      := -buildmode=pie -mod=readonly
 export GOTOOLCHAIN  := local
+ifneq (,$(wildcard vendor/modules.txt))
+export GOFLAGS      := -buildmode=pie -mod=vendor
+export GOPROXY      := off
+else
+export GOFLAGS      := -buildmode=pie -mod=readonly
+endif
+# Builders may have no writable HOME (Launchpad: /nonexistent).
+export GOCACHE      := $(CURDIR)/debian/.gocache
+export GOPATH       := $(CURDIR)/debian/.gopath
 
+# Ubuntu 22.04 and 24.04 have Go 1.25 as golang-1.25-go, outside PATH.
+GO_DIR := $(lastword $(sort $(wildcard /usr/lib/go-1.2[5-9])))
+ifneq (,$(GO_DIR))
+export PATH := $(GO_DIR)/bin:$(PATH)
+endif
+
+WITH_PLASMA := $(filter plasma-nm-outline,$(shell dh_listpackages 2>/dev/null))
 PLASMA_BUILD := obj-plasma
 PLASMA_NM_SRC := $(CURDIR)/plasma/third_party/plasma-nm
 
@@ -33,27 +52,36 @@ PLASMA_NM_NEXT     := $(shell echo '$(PLASMA_NM_UPSTREAM)' | awk -F. -v OFS=. '{
 	dh $@
 
 override_dh_auto_clean:
-	rm -rf $(PLASMA_BUILD) bin
+	rm -rf $(PLASMA_BUILD) bin debian/.gocache debian/.gopath
 
 override_dh_auto_configure:
+ifneq (,$(WITH_PLASMA))
 	@test -f $(PLASMA_NM_SRC)/libs/editor/vpnuiplugin.h || \
 	  { echo "plasma-nm headers missing in $(PLASMA_NM_SRC); build with 'make deb'" >&2; exit 1; }
 	dh_auto_configure --sourcedirectory=plasma --builddirectory=$(PLASMA_BUILD) -- \
 	  -DPLASMA_NM_SRC=$(PLASMA_NM_SRC) -DBUILD_TESTING=ON
+endif
 
 override_dh_auto_build:
+	go version
 	$(MAKE) service
+ifneq (,$(WITH_PLASMA))
 	dh_auto_build --sourcedirectory=plasma --builddirectory=$(PLASMA_BUILD)
+endif
 
 override_dh_auto_test:
 ifeq (,$(filter nocheck,$(DEB_BUILD_OPTIONS)))
 	$(MAKE) test
+ifneq (,$(WITH_PLASMA))
 	cd $(PLASMA_BUILD) && QT_QPA_PLATFORM=offscreen ctest --output-on-failure
+endif
 endif
 
 override_dh_auto_install:
 	$(MAKE) install-service PREFIX=/usr DESTDIR=$(CURDIR)/debian/network-manager-outline
+ifneq (,$(WITH_PLASMA))
 	DESTDIR=$(CURDIR)/debian/plasma-nm-outline cmake --install $(PLASMA_BUILD)
+endif
 
 # dwz does not understand Go's DWARF.
 override_dh_dwz:
@@ -65,6 +93,10 @@ override_dh_shlibdeps:
 	dh_shlibdeps -- --ignore-missing-info
 
 override_dh_gencontrol:
+ifneq (,$(WITH_PLASMA))
 	@test -n '$(PLASMA_NM_UPSTREAM)' || { echo "plasma-nm is not installed" >&2; exit 1; }
 	dh_gencontrol -- \
 	  '-Vplasmanm:Depends=plasma-nm (>= $(PLASMA_NM_UPSTREAM)), plasma-nm (<< $(PLASMA_NM_NEXT)~)'
+else
+	dh_gencontrol
+endif

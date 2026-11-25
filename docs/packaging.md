@@ -27,9 +27,41 @@ ls dist/
 Skip the tests with `DEB_BUILD_OPTIONS=nocheck make deb`.
 
 The build needs network access when Go modules are not in the module cache
-yet, and for fetching the plasma-nm headers the first time. Building in a
-clean chroot (pbuilder, sbuild, a PPA) would need the Go modules vendored and
-the plasma-nm headers in the source package; that is not set up yet.
+yet, and for fetching the plasma-nm headers the first time. It builds for the
+Ubuntu release it runs on, with the plasma-nm installed there.
+
+## Packages for Ubuntu releases and the PPA
+
+```sh
+make deb-series SERIES=noble          # or jammy, resolute; SNAPSHOT=1 for test builds
+ls dist/noble/
+```
+
+`tools/deb-series.py` builds the source package (and the binaries) for one
+Ubuntu release so that it builds without network, as Launchpad requires. It
+copies the working tree to `build/deb/<series>/` and there:
+
+- **vendors the Go modules** (`vendor/`), and adds the C sources of cgo
+  modules that `go mod vendor` leaves out: it copies only directories with Go
+  files, and go-tun2socks keeps lwIP's C code in others (205 files);
+- **bundles the plasma-nm headers** (26.04 only) of the plasma-nm version
+  apt would install, which is what Launchpad builds against, and pins the
+  build dependency to it, e.g. `plasma-nm (>= 4:6.6.7), plasma-nm (<< 4:6.6.8~)`;
+- **adapts `debian/control`**: 22.04 and 24.04 (Plasma 5) get only
+  `network-manager-outline`, without the plugin's build dependencies, and
+  Go from `golang-1.25-go`;
+- **adds a changelog entry** with the version `<version>~ubuntu<NN.NN>.1`,
+  e.g. `0.2.0~ubuntu22.04.1`. The suffixes sort in release order and below
+  `0.2.0`, so upgrading Ubuntu upgrades the package.
+
+`debian/rules` uses `vendor/` when it is present (with `GOPROXY=off`), keeps
+Go's cache inside the build tree (Launchpad builders have no writable
+`HOME`), finds `golang-1.25-go` in `/usr/lib/go-1.25`, and skips the plugin
+when `debian/control` does not list it.
+
+The Build workflow runs this for every release and then builds the binaries
+from the `.dsc` in a clean container, like Launchpad; see [ci.md](ci.md).
+All three were checked this way, offline, before the workflows existed.
 
 ## How `debian/rules` works
 
@@ -62,5 +94,5 @@ sudo apt install ./dist/plasma-nm-outline_*.deb ./dist/network-manager-outline_*
 
 ## Releasing a new version
 
-Add an entry to `debian/changelog` (the version there is the package
-version), for example with `dch -v 0.2.0` from `devscripts`.
+Prepare release adds the `debian/changelog` entry, tags and builds; Publish
+release uploads to the PPA. See [ci.md](ci.md#releasing).

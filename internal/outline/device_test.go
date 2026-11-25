@@ -51,16 +51,16 @@ func fakeDNS(t *testing.T) string {
 						return
 					}
 					b := dnsmessage.NewBuilder(nil, dnsmessage.Header{ID: h.ID, Response: true, RecursionAvailable: true})
-					b.StartQuestions()
-					b.Question(q)
-					b.StartAnswers()
+					_ = b.StartQuestions()
+					_ = b.Question(q)
+					_ = b.StartAnswers()
 					if q.Type == dnsmessage.TypeA {
-						b.AResource(dnsmessage.ResourceHeader{Name: q.Name, Class: dnsmessage.ClassINET, TTL: 60},
+						_ = b.AResource(dnsmessage.ResourceHeader{Name: q.Name, Class: dnsmessage.ClassINET, TTL: 60},
 							dnsmessage.AResource{A: [4]byte{192, 0, 2, 53}})
 					}
 					resp, _ := b.Finish()
-					binary.Write(c, binary.BigEndian, uint16(len(resp)))
-					c.Write(resp)
+					_ = binary.Write(c, binary.BigEndian, uint16(len(resp)))
+					_, _ = c.Write(resp)
 				}
 			}()
 		}
@@ -101,7 +101,7 @@ func newSSServer(t *testing.T, method, password, upstream string) *ssServer {
 				sc := ciph.StreamConn(c)
 				tgt, err := socks.ReadAddr(sc)
 				if err != nil {
-					io.Copy(io.Discard, c) // wrong key: stay silent
+					_, _ = io.Copy(io.Discard, c) // wrong key: stay silent
 					return
 				}
 				s.mu.Lock()
@@ -112,8 +112,8 @@ func newSSServer(t *testing.T, method, password, upstream string) *ssServer {
 					return // upstream unreachable: close
 				}
 				defer up.Close()
-				go io.Copy(up, sc)
-				io.Copy(sc, up)
+				go func() { _, _ = io.Copy(up, sc) }()
+				_, _ = io.Copy(sc, up)
 			}()
 		}
 	}()

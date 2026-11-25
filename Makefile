@@ -19,7 +19,7 @@ BIN := bin/nm-outline-service
 
 PLASMA_NM_VERSION ?= $(shell dpkg-query -W -f='$${Version}' plasma-nm 2>/dev/null | sed -E 's/^[0-9]+://; s/-.*//')
 
-.PHONY: all service test vet icons plasma plasma-test deb install install-service install-plasma uninstall clean
+.PHONY: all service test vet lint icons plasma plasma-test deb deb-series install install-service install-plasma uninstall clean
 
 all: service
 
@@ -31,6 +31,11 @@ test:
 
 vet:
 	$(GO) vet ./...
+
+# Same linters and version as the PR check (.github/workflows/check-pr.yaml).
+GOLANGCI_LINT_VERSION := v2.15.0
+lint:
+	$(GO) run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION) run ./...
 
 # All variants are also rendered as PNG in ICON_SIZES (committed, so building
 # does not need inkscape). nm-outline.svg and its PNGs are installed
@@ -68,6 +73,14 @@ deb: plasma/third_party/plasma-nm
 	mkdir -p dist
 	mv ../network-manager-outline*_$(DEB_VERSION)_* ../plasma-nm-outline*_$(DEB_VERSION)_* dist/
 	@ls -1 dist/*.deb
+
+# Source and binary packages for one Ubuntu release (jammy, noble, resolute)
+# into dist/<series>/, as the Build workflow and the PPA build them: vendored
+# Go modules, bundled plasma-nm headers, no network needed to build. SNAPSHOT=1
+# adds a +git<date>.<commit> suffix. See docs/packaging.md.
+deb-series:
+	@test -n "$(SERIES)" || { echo "usage: make deb-series SERIES=jammy|noble|resolute [SNAPSHOT=1]" >&2; exit 1; }
+	python3 tools/deb-series.py --series $(SERIES) $(if $(SNAPSHOT),--snapshot)
 
 install: install-service
 
