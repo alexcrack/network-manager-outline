@@ -22,6 +22,10 @@
   <img alt="outline-sdk" src="https://img.shields.io/badge/built_on-outline--sdk-5a5a5a">
 </p>
 
+<p align="center">
+  <a href="https://launchpad.net/~a13xcrack/+archive/ubuntu/network-manager-outline"><img src="https://media.launchpad.net/lp-badge-kit/launchpad-badge-w160px.png" width="160" height="37" alt="Uses Launchpad: ppa:a13xcrack/network-manager-outline"></a>
+</p>
+
 ---
 
 A NetworkManager VPN plugin built on
