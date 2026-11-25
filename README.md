@@ -51,6 +51,27 @@ network applet like any other VPN.
   server as a connection failure.
 - **Works with `nmcli`** too, no GUI required.
 
+## Screenshots
+
+<p align="center">
+  <img src="assets/network-manager.png" width="800" alt="The Outline VPN connection in System Settings → Wi-Fi &amp; Networking: access key with storage options, DNS servers, IPv6 mode and transport prefix">
+  <br>
+  <em>The connection settings in System Settings → Wi-Fi &amp; Networking</em>
+</p>
+
+<table align="center">
+  <tr>
+    <td align="center">
+      <img src="assets/connections.png" width="380" alt="The Plasma network applet listing the Outline VPN connection with a Connect button"><br>
+      <em>Connect from the network applet</em>
+    </td>
+    <td align="center">
+      <img src="assets/connection-active.png" width="380" alt="The Plasma network applet with the Outline VPN connected, showing its details"><br>
+      <em>Connected, with its details</em>
+    </td>
+  </tr>
+</table>
+
 ## How it works
 
 ```mermaid
