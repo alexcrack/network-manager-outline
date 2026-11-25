@@ -29,8 +29,7 @@ and the network applet, without the Outline client. The original goal is met.
 
 ## Next steps
 
-1. Phase 2, starting with `ssconf://` keys (needed by many Outline providers)
-   and reconnect on network change.
+1. Phase 2: reconnect on network change, then a last-good copy of dynamic keys.
 2. Phase 4: install-test the Debian packages, then GNOME support or a PPA.
 
 ## Roadmap
@@ -83,7 +82,10 @@ Goal: `nmcli connection up` works with a real `ss://` key.
    - [x] `make && sudo make install` works. Install targets no longer build (they depended on the phony `service` target, so `sudo make install` ran `go build` as root, and sudo's PATH has no `go`). They fail clearly if nothing is built and warn if sources are newer than the binary. Added `uninstall`.
 
 ### Phase 2: dynamic keys and robustness
-- [ ] `ssconf://` keys (currently rejected with a clear error): fetch over HTTPS; response is an `ss://` URL or JSON (`server`, `server_port`, `password`, `method`, `prefix`)
+- [x] Dynamic `ssconf://` / `https://` keys, following Outline's docs and the official client (`outline-apps` `fetch.go`, `parse.go`, `config.ts`): fetched on every connect; `ss://`, legacy JSON, YAML `transport` (shadowsocks, tcpudp) and provider errors. Redirects must stay on HTTPS; other transport types are rejected as not supported yet. See [architecture.md](architecture.md#settings).
+- [ ] Manual test with a real dynamic key
+- [ ] Keep the last successfully fetched dynamic key and use it when the provider is unreachable (Outline's docs say clients reuse the last good config)
+- [ ] More transport types from the YAML config (websocket, `first-supported`)
 - [ ] IPv6 `block` mode (route IPv6 into the tunnel and reject it there). `tunnel` (default) and `off` exist since phase 1.
 - [ ] Reconnect on network change (`can-persist`, re-resolve the server)
 - [ ] Interactive secrets (`ConnectInteractive`, `SecretsRequired`, `NewSecrets`) if needed

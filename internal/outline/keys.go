@@ -13,5 +13,5 @@ const (
 	KeyNeverDefault    = "never-default"    // "yes" to not install a default route
 	KeyTransportPrefix = "transport-prefix" // optional configurl prefix for TCP, e.g. "split:2"
 
-	SecretAccessKey = "access-key" // ss://... or ssconf://...
+	SecretAccessKey = "access-key" // ss://..., or a dynamic ssconf://... / https://... key
 )

@@ -7,7 +7,7 @@ class PasswordField;
 
 namespace OutlineUtils
 {
-// True if text looks like an Outline access key (ss:// or ssconf://).
+// True if text looks like an Outline access key (ss://, ssconf:// or https://).
 // The service does the full validation when connecting.
 bool isAccessKey(const QString &text);
 

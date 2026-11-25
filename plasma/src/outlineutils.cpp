@@ -11,7 +11,8 @@ namespace OutlineUtils
 bool isAccessKey(const QString &text)
 {
     const QString t = text.trimmed();
-    return t.startsWith(QLatin1String("ss://"), Qt::CaseInsensitive) || t.startsWith(QLatin1String("ssconf://"), Qt::CaseInsensitive);
+    return t.startsWith(QLatin1String("ss://"), Qt::CaseInsensitive) || t.startsWith(QLatin1String("ssconf://"), Qt::CaseInsensitive)
+        || t.startsWith(QLatin1String("https://"), Qt::CaseInsensitive);
 }
 
 QString findAccessKey(const QString &text)
@@ -24,12 +25,21 @@ QString findAccessKey(const QString &text)
 QString nameForKey(const QString &key)
 {
     const QUrl url(key.trimmed());
-    const QString fragment = url.fragment(QUrl::FullyDecoded).trimmed();
-    if (!fragment.isEmpty()) {
-        return fragment;
+    // Like the official client: the first &-separated fragment entry that is
+    // not a key=value pair.
+    const QStringList parts = url.fragment(QUrl::FullyEncoded).split(QLatin1Char('&'));
+    for (const QString &part : parts) {
+        if (!part.isEmpty() && !part.contains(QLatin1Char('='))) {
+            const QString name = QUrl::fromPercentEncoding(part.toUtf8()).trimmed();
+            if (!name.isEmpty()) {
+                return name;
+            }
+        }
     }
-    // SIP002 keys have a readable host; legacy all-base64 keys do not.
-    if (!url.userInfo().isEmpty() && !url.host().isEmpty()) {
+    // SIP002 and dynamic keys have a readable host (for dynamic keys, the key
+    // server's); legacy all-base64 ss:// keys do not.
+    const bool dynamic = url.scheme().compare(QLatin1String("ss"), Qt::CaseInsensitive) != 0;
+    if ((dynamic || !url.userInfo().isEmpty()) && !url.host().isEmpty()) {
         return QStringLiteral("Outline (%1)").arg(url.host());
     }
     return QStringLiteral("Outline");

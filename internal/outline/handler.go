@@ -7,6 +7,7 @@ import (
 	"io"
 	"log/slog"
 	"net"
+	"net/http"
 	"net/netip"
 	"sync"
 	"time"
@@ -49,9 +50,10 @@ type Handler struct {
 	log *slog.Logger
 
 	// Injection points for tests.
-	openTUN  func() (tunnelDevice, error)
-	newStack func(ctx context.Context, t Transport) (stack, error)
-	resolver *net.Resolver
+	openTUN    func() (tunnelDevice, error)
+	newStack   func(ctx context.Context, t Transport) (stack, error)
+	resolver   *net.Resolver
+	httpClient *http.Client // nil = default
 
 	mu   sync.Mutex
 	sess *session
@@ -85,8 +87,13 @@ func (h *Handler) Connect(ctx context.Context, s nmvpn.ConnectionSettings, e nmv
 	if err != nil {
 		return err
 	}
-	sess := &session{h: h, st: st, e: e, done: make(chan struct{}),
-		log: h.log.With("connection", s.ID(), "server", st.AccessKey.Server())}
+	log := h.log.With("connection", s.ID())
+	if st.DynamicKey != nil {
+		log = log.With("key_server", st.DynamicKey.Host()) // never the path: often a token
+	} else {
+		log = log.With("server", st.AccessKey.Server())
+	}
+	sess := &session{h: h, st: st, e: e, done: make(chan struct{}), log: log}
 
 	h.mu.Lock()
 	h.sess = sess
@@ -143,11 +150,28 @@ func (s *session) run(ctx context.Context) {
 		if ctx.Err() != nil {
 			return // already tearing down
 		}
-		s.log.Error("tunnel failed", "step", step, "err", s.st.AccessKey.Redact(err.Error()))
+		s.log.Error("tunnel failed", "step", step, "err", s.st.redact(err.Error()))
 		s.e.Fail(reason)
 		<-ctx.Done()
 	}
 	fail := func(step string, err error) { failWith(nmvpn.FailureConnectFailed, step, err) }
+
+	// 0. Fetch a dynamic key. Like the official client, on every connect.
+	if dk := s.st.DynamicKey; dk != nil {
+		key, err := dk.Fetch(ctx, s.h.httpClient)
+		if err != nil {
+			var fe *FetchError
+			if errors.As(err, &fe) && fe.Rejected {
+				failWith(nmvpn.FailureLoginFailed, "fetch", err)
+			} else {
+				fail("fetch", err)
+			}
+			return
+		}
+		s.st.AccessKey = key
+		s.log = s.log.With("server", key.Server())
+		s.log.Info("fetched dynamic key")
+	}
 
 	// 1. Resolve the server before NM changes routes and DNS.
 	rctx, cancel := context.WithTimeout(ctx, resolveTimeout)
@@ -217,7 +241,7 @@ func (s *session) run(ctx context.Context) {
 		ok, err := dev.ProbeUDP(pctx, resolver)
 		switch {
 		case err != nil:
-			s.log.Warn("UDP probe inconclusive, staying in DNS-truncate mode", "err", s.st.AccessKey.Redact(err.Error()))
+			s.log.Warn("UDP probe inconclusive, staying in DNS-truncate mode", "err", s.st.redact(err.Error()))
 		case ok:
 			s.log.Info("server relays UDP")
 		default:

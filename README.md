@@ -30,8 +30,9 @@ network applet like any other VPN.
 
 - **Native Plasma integration.** "Outline VPN" in *System Settings → Wi-Fi &
   Networking*, connect and disconnect from the panel applet.
-- **Access keys as you get them.** Paste an `ss://` key or import a `.txt` file
-  containing one. Outline, SIP002 and legacy key formats are supported.
+- **Access keys as you get them.** Paste a key or import a `.txt` file
+  containing one. Static `ss://` keys (Outline, SIP002 and legacy formats) and
+  dynamic `ssconf://` keys, fetched from your provider on every connect.
 - **Secure key storage.** Store the key in KWallet for your user, system-wide,
   or be asked every time.
 - **Everything through the tunnel.** IPv4, IPv6, DNS (no leaks to other links)
@@ -128,7 +129,7 @@ nmcli connection up outline
 
 | Setting | Values | Default |
 |---|---|---|
-| Access key (`access-key` secret) | `ss://…` | required |
+| Access key (`access-key` secret) | `ss://…`, or a dynamic `ssconf://…` / `https://…` key | required |
 | DNS servers (`dns`) | IPv4/IPv6 addresses, separated by commas or spaces | `1.1.1.1` |
 | IPv6 (`ipv6`) | `tunnel` (through the VPN), `off` (bypasses it) | `tunnel` |
 | Default route (`never-default`) | `yes` keeps other traffic off the VPN | `no` |
@@ -197,7 +198,8 @@ go test -c -o bin/tun.test ./internal/tun && sudo bin/tun.test -test.v
 
 - [x] Service with `nmcli`
 - [x] Plasma plugin
-- [ ] Dynamic `ssconf://` keys, reconnect on network change
+- [x] Dynamic `ssconf://` keys
+- [ ] Reconnect on network change
 - [x] Debian packages
 - [x] CI and Launchpad PPA releases
 - [ ] GNOME support

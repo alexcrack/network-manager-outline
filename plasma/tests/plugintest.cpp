@@ -132,6 +132,41 @@ private Q_SLOTS:
         g_object_unref(c);
     }
 
+    void importDynamicKey_data()
+    {
+        QTest::addColumn<QString>("key");
+        QTest::addColumn<QString>("name");
+        QTest::newRow("fragment name") << QStringLiteral("ssconf://keys.example.com/u/123#Work%20VPN") << QStringLiteral("Work VPN");
+        QTest::newRow("name among key=value") << QStringLiteral("ssconf://keys.example.com/u/123#a=1&Home&b=2") << QStringLiteral("Home");
+        QTest::newRow("no name") << QStringLiteral("ssconf://keys.example.com/u/123") << QStringLiteral("Outline (keys.example.com)");
+    }
+
+    void importDynamicKey()
+    {
+        QFETCH(QString, key);
+        QFETCH(QString, name);
+        QTemporaryFile f(QStringLiteral("XXXXXX.txt"));
+        QVERIFY(f.open());
+        f.write(key.toUtf8() + "\n");
+        f.close();
+        auto result = plugin->importConnectionSettings(f.fileName());
+        QVERIFY2(result, qPrintable(result.errorMessage()));
+        QCOMPARE(QString::fromUtf8(nm_connection_get_id(result.connection())), name);
+        QCOMPARE(QString::fromUtf8(nm_setting_vpn_get_secret(nm_connection_get_setting_vpn(result.connection()), NM_OUTLINE_SECRET_ACCESS_KEY)), key);
+        g_object_unref(result.connection());
+    }
+
+    void dynamicKeyIsValid()
+    {
+        VpnSetting::Ptr empty(new VpnSetting);
+        std::unique_ptr<SettingWidget> w(plugin->widget(empty, nullptr));
+        auto *field = w->findChild<PasswordField *>(QStringLiteral("accessKey"));
+        field->setText(QStringLiteral("ssconf://keys.example.com/u/123"));
+        QVERIFY(w->isValid());
+        field->setText(QStringLiteral("https://keys.example.com/u/123"));
+        QVERIFY(w->isValid());
+    }
+
     void importRejectsOtherFiles()
     {
         QTemporaryFile f(QStringLiteral("XXXXXX.txt"));

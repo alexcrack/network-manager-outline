@@ -3,6 +3,7 @@ module network-manager-outline
 go 1.25.0
 
 require (
+	github.com/goccy/go-yaml v1.17.1
 	github.com/godbus/dbus/v5 v5.1.0
 	golang.getoutline.org/sdk v0.1.0
 	golang.getoutline.org/sdk/x v0.3.0
