@@ -126,5 +126,12 @@ Actions to push to them.
   rebuilt anyway, so make a new patch release.
 - **amd64 only.** Launchpad builds the architectures enabled for the PPA;
   the packages are `linux-any`, but only amd64 is tested.
+- **Asset names.** GitHub replaces `~` in release asset names with `.`, so
+  `network-manager-outline_0.2.0~ubuntu24.04.1_amd64.deb` is published as
+  `network-manager-outline_0.2.0.ubuntu24.04.1_amd64.deb`. Prepare release
+  names the files that way before writing `SHA256SUMS`, so it matches the
+  downloads; Publish release restores the Debian names from each
+  `_source.changes` (which lists every file's name and SHA-256) before
+  signing and uploading.
 - **Upload over FTP.** dput uploads to `ppa.launchpad.net` over FTP, which
   GitHub-hosted runners allow.

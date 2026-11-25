@@ -181,6 +181,10 @@ jobs:
 
       - name: Create the draft release
         run: |
+          # GitHub replaces "~" in asset names with "."; name the files as
+          # they will be downloaded, so SHA256SUMS matches them. Publish
+          # release restores the Debian names from the .changes files.
+          for f in dist/*~*; do mv -- "$f" "${f//\~/.}"; done
           (cd dist && sha256sum -- * > SHA256SUMS && cat SHA256SUMS)
           gh release create "$TAG" --draft --verify-tag \
             --title "network-manager-outline $VERSION" \
