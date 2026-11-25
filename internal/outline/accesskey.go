@@ -33,7 +33,7 @@ type AccessKey struct {
 // following outline-sdk's configurl parser. Unknown query parameters such as
 // outline=1 are ignored. It does no network I/O.
 //
-// ssconf:// (dynamic) keys are resolved separately (phase 2).
+// ssconf:// (dynamic) keys are handled by ParseDynamicKey.
 func ParseAccessKey(key string) (*AccessKey, error) {
 	key = strings.TrimSpace(key)
 	u, err := url.Parse(key)
@@ -42,8 +42,8 @@ func ParseAccessKey(key string) (*AccessKey, error) {
 	}
 	switch strings.ToLower(u.Scheme) {
 	case "ss":
-	case "ssconf":
-		return nil, errors.New("dynamic ssconf:// access keys are not supported yet")
+	case "ssconf", "https":
+		return nil, errors.New("dynamic access key: use ParseDynamicKey")
 	default:
 		return nil, fmt.Errorf("access key must start with ss://, got %q", u.Scheme+"://")
 	}
@@ -128,7 +128,7 @@ func redactSSURL(u string) string {
 // from outline-sdk, which may quote the transport config).
 func (k *AccessKey) Redact(s string) string {
 	s = ssURL.ReplaceAllStringFunc(s, redactSSURL)
-	if k.Password == "" {
+	if k == nil || k.Password == "" {
 		return s
 	}
 	creds := k.Method + ":" + k.Password
@@ -212,9 +212,23 @@ func (k *AccessKey) ResolveServer(ctx context.Context, r *net.Resolver) (netip.A
 	return netip.Addr{}, fmt.Errorf("resolve server %s: no addresses", k.Host)
 }
 
+// IsDynamicKey reports whether key is an ssconf:// or https:// dynamic key.
+func IsDynamicKey(key string) bool {
+	k := strings.ToLower(strings.TrimSpace(key))
+	return strings.HasPrefix(k, "ssconf://") || strings.HasPrefix(k, "https://")
+}
+
+// redact removes the credentials of both the fetched and the dynamic key.
+func (s *Settings) redact(msg string) string {
+	return s.DynamicKey.Redact(s.AccessKey.Redact(msg))
+}
+
 // Settings are the Outline options of an NM connection profile.
 type Settings struct {
+	// Exactly one is set from the profile. For a dynamic key, the session
+	// fills in AccessKey after fetching it.
 	AccessKey       *AccessKey
+	DynamicKey      *DynamicKey
 	DNS             []netip.Addr
 	IPv6            string // IPv6Tunnel or IPv6Off
 	NeverDefault    bool
@@ -238,11 +252,20 @@ func ParseSettings(s nmvpn.ConnectionSettings) (*Settings, error) {
 	if strings.TrimSpace(key) == "" {
 		return nil, bad("missing %q secret", SecretAccessKey)
 	}
-	ak, err := ParseAccessKey(key)
-	if err != nil {
-		return nil, bad("%v", err)
+	st := &Settings{IPv6: IPv6Tunnel, TransportPrefix: data[KeyTransportPrefix]}
+	if IsDynamicKey(key) {
+		dk, err := ParseDynamicKey(key)
+		if err != nil {
+			return nil, bad("%v", err)
+		}
+		st.DynamicKey = dk
+	} else {
+		ak, err := ParseAccessKey(key)
+		if err != nil {
+			return nil, bad("%v", err)
+		}
+		st.AccessKey = ak
 	}
-	st := &Settings{AccessKey: ak, IPv6: IPv6Tunnel, TransportPrefix: data[KeyTransportPrefix]}
 
 	for _, f := range strings.FieldsFunc(data[KeyDNS], func(r rune) bool { return r == ',' || r == ' ' || r == ';' }) {
 		ip, err := netip.ParseAddr(f)

@@ -90,6 +90,9 @@ Connect(settings)                ─► state STARTING; Handler.Connect parses t
                                     (invalid → BadArguments, STOPPED) and starts a session
                                     goroutine; reply (connect timer: 60 s to reach STARTED)
                                     session:
+                                      0. dynamic key: fetch it over HTTPS (10 s); a refused
+                                         key (provider error, HTTP 401/403/404/410) →
+                                         LOGIN_FAILED, other failures → CONNECT_FAILED
                                       1. resolve the server host (10 s), prefer IPv4
                                       2. build the outline-sdk stack with the IP, not the hostname
                                       3. checks (10 s each): plain TCP connect to the server
@@ -156,7 +159,7 @@ Stored in the NetworkManager connection profile. Names are defined in
 
 | Key | Where | Values | Default |
 |---|---|---|---|
-| `access-key` | `vpn.secrets` | `ss://…` or `ssconf://…` | required |
+| `access-key` | `vpn.secrets` | `ss://…`, or a dynamic `ssconf://…` / `https://…` key | required |
 | `dns` | `vpn.data` | comma-separated IPs | `1.1.1.1` |
 | `ipv6` | `vpn.data` | `tunnel`, `off` | `tunnel` |
 | `never-default` | `vpn.data` | `yes`, `no` (also `true`/`false`, `1`/`0`) | `no` |
@@ -177,9 +180,30 @@ enables debug messages. Timestamps are left to the journal in that case.
 `--debug` forces debug logging and keeps the service running after a
 disconnect, for running it by hand.
 
-Supported access keys: `ss://` in Outline/SIP002 form (base64url, standard
-base64 or plain userinfo), and the legacy all-base64 form, with optional
-`?prefix=` and `#name`. `ssconf://` keys are rejected for now (phase 2).
+Supported access keys:
+
+- **Static:** `ss://` in Outline/SIP002 form (base64url, standard base64 or
+  plain userinfo), and the legacy all-base64 form, with optional `?prefix=`
+  and `#name`.
+- **Dynamic** (`internal/outline/dynamic.go`): `ssconf://host[:port]/path?query`
+  is fetched from `https://host[:port]/path?query` on every connect; plain
+  `https://` keys work too, and the `#fragment` is only a name. This follows
+  Outline's documentation and the official client: one `GET` with a 10 s
+  timeout, any non-2xx status is an error. The trimmed body may be:
+  - an `ss://` link;
+  - the legacy JSON object (`server`, `server_port`, `password`, `method`,
+    `prefix`);
+  - the YAML/JSON `transport` config, with `$type: shadowsocks` (endpoint as
+    `host:port` or `{$type: dial, address}`) or a `$type: tcpudp` pair of the
+    same Shadowsocks server;
+  - a provider error `{"error": {"message", "details"}}`, which is logged and
+    reported as a login failure.
+
+  Two deliberate differences from the official client: redirects must stay
+  on HTTPS, and other transport types (websocket, `first-supported`, custom
+  dialers, TCP and UDP through different servers) fail with "not supported
+  yet". The key's path and query are often a per-user token, so only its
+  host is logged.
 
 The access key contains the Shadowsocks password, so it is a secret. Its
 storage follows the standard `access-key-flags`: system-owned (stored by
