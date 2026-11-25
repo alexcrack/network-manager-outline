@@ -154,7 +154,7 @@ The service logs each connection step. Access keys are never logged.
 ```sh
 make test          # Go tests, including D-Bus tests against a private dbus-daemon
 make plasma-test   # loads the built Plasma plugin offscreen and tests it
-make icons         # regenerates the icons from data/icons/make_icon.py
+make icons         # regenerates the SVG and PNG icons (needs inkscape for the PNGs)
 ```
 
 The TUN test needs root and is skipped otherwise:
