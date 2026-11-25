@@ -53,6 +53,7 @@ private Q_SLOTS:
 
         const QVariantMap s = w->setting();
         QCOMPARE(s.value(QStringLiteral("service-type")).toString(), QStringLiteral(NM_DBUS_SERVICE_OUTLINE));
+        QVERIFY2(s.value(QStringLiteral("persistent")).toBool(), "new connections should stay connected");
         const NMStringMap secrets = mapValue(s, "secrets");
         QCOMPARE(secrets.value(QStringLiteral(NM_OUTLINE_SECRET_ACCESS_KEY)), key);
         // Defaults are not stored, only the secret flags.
@@ -78,6 +79,9 @@ private Q_SLOTS:
 
         std::unique_ptr<SettingWidget> w(plugin->widget(in, nullptr));
         QVERIFY(w->isValid());
+        // An existing connection keeps its persistent value (false here).
+        QVERIFY(!w->findChild<QCheckBox *>(QStringLiteral("persistent"))->isChecked());
+        QVERIFY(!w->setting().value(QStringLiteral("persistent")).toBool());
         QCOMPARE(w->findChild<QComboBox *>(QStringLiteral("ipv6"))->currentIndex(), 1);
         QVERIFY(w->findChild<QCheckBox *>(QStringLiteral("neverDefault"))->isChecked());
         QCOMPARE(w->findChild<PasswordField *>(QStringLiteral("accessKey"))->passwordOption(), PasswordField::StoreForAllUsers);
@@ -85,6 +89,17 @@ private Q_SLOTS:
         const QVariantMap out = w->setting();
         QCOMPARE(mapValue(out, "data"), data);
         QCOMPARE(mapValue(out, "secrets").value(QStringLiteral(NM_OUTLINE_SECRET_ACCESS_KEY)), key);
+    }
+
+    void persistentRoundTrip()
+    {
+        VpnSetting::Ptr in(new VpnSetting);
+        in->setData({{QStringLiteral(NM_OUTLINE_SECRET_ACCESS_KEY_FLAGS), QStringLiteral("0")}});
+        in->setPersistent(true);
+        std::unique_ptr<SettingWidget> w(plugin->widget(in, nullptr));
+        QVERIFY(w->findChild<QCheckBox *>(QStringLiteral("persistent"))->isChecked());
+        w->findChild<QCheckBox *>(QStringLiteral("persistent"))->setChecked(false);
+        QVERIFY(!w->setting().value(QStringLiteral("persistent")).toBool());
     }
 
     void alwaysAskStoresNoSecret()
@@ -128,6 +143,7 @@ private Q_SLOTS:
         QCOMPARE(QString::fromUtf8(nm_setting_vpn_get_service_type(vpn)), QStringLiteral(NM_DBUS_SERVICE_OUTLINE));
         QCOMPARE(QString::fromUtf8(nm_setting_vpn_get_secret(vpn, NM_OUTLINE_SECRET_ACCESS_KEY)), key);
         QCOMPARE(QString::fromUtf8(nm_setting_vpn_get_data_item(vpn, NM_OUTLINE_SECRET_ACCESS_KEY_FLAGS)), QStringLiteral("1"));
+        QVERIFY(nm_setting_vpn_get_persistent(vpn));
         QVERIFY(nm_connection_verify(c, nullptr));
         g_object_unref(c);
     }

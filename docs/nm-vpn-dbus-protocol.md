@@ -126,7 +126,7 @@ error becomes `Failed`.
 | `mtu` | `u` | |
 | `has-ip4` | `b` | Missing means false. |
 | `has-ip6` | `b` | Missing means false. |
-| `can-persist` | `b` | Service can keep the tunnel across underlying device changes. |
+| `can-persist` | `b` | Service can keep the tunnel across underlying device changes. Sent as `true`; NetworkManager keeps the VPN across them only if the profile also has `vpn.persistent=yes` (see [architecture.md](architecture.md#network-changes)). |
 | `banner` | `s` | |
 | `pac` | `s` | Proxy auto-config URL. |
 

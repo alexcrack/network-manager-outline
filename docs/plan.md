@@ -87,7 +87,8 @@ Goal: `nmcli connection up` works with a real `ss://` key.
 - [ ] Keep the last successfully fetched dynamic key and use it when the provider is unreachable (Outline's docs say clients reuse the last good config)
 - [ ] More transport types from the YAML config (websocket, `first-supported`)
 - [ ] IPv6 `block` mode (route IPv6 into the tunnel and reject it there). `tunnel` (default) and `off` exist since phase 1.
-- [ ] Reconnect on network change (`can-persist`, re-resolve the server)
+- [x] Stay connected on network change: the service reports `can-persist`; with `vpn.persistent=yes` (Plasma checkbox, on by default) NetworkManager keeps the VPN and moves the server route to the new device. A loop guard refuses tunnel traffic to the server while that route is missing. Reconnects after failures re-resolve the server. See [architecture.md](architecture.md#network-changes).
+- [ ] Manual test: switch Wi-Fi networks, toggle Wi-Fi, suspend and resume with a persistent connection
 - [ ] Interactive secrets (`ConnectInteractive`, `SecretsRequired`, `NewSecrets`) if needed
 - [x] Logging to the journal: done in phase 1. NetworkManager passes the service's stderr to the journal, and the level follows `NM_VPN_LOG_LEVEL`.
 

@@ -152,6 +152,33 @@ connection before the previous session has been torn down.
 - **Tunnel addresses.** `10.233.233.1/32` and `fdcc:a7f5:9233::1/128` are only
   used on this host; lwIP terminates all connections locally.
 
+## Network changes
+
+The service reports `can-persist` in `Config`: the tunnel survives a change
+of the underlying network, because every connection through it dials the
+Outline server anew. Whether NetworkManager uses that depends on the
+profile's `vpn.persistent` ("Stay connected when the network changes" in the
+Plasma form, on by default for new and imported connections):
+
+| `vpn.persistent` | When the network device goes away or changes |
+|---|---|
+| `yes` | The VPN stays active, detached from any device. When a new default device comes up, NetworkManager attaches the VPN to it and moves the host route to the server there (`nm-policy.c`, `device_changed` in `nm-vpn-connection.c`). The tunnel's routes and DNS stay in place meanwhile, so no traffic leaks outside the VPN. |
+| `no` (NetworkManager's default) | The VPN is disconnected with the device. |
+
+Connections open during the change break, because their path to the server
+changes; applications reconnect through the tunnel once the new network is
+up. A reconnect after a real failure runs `Connect` again, which resolves
+the server (and fetches a dynamic key) anew.
+
+**Loop guard.** While a persistent VPN waits for the next network, the host
+route to the server is gone but the tunnel's default route stays. The
+service's own connections to the server would enter the tunnel, which would
+dial the server through the tunnel again: an endless storm of connections.
+The tunnel therefore refuses all traffic to the server's address
+(`internal/outline/loopguard.go`): those dials fail at once, and work again
+when the route to the server is back. It is logged once per episode
+("traffic to the server entered the tunnel").
+
 ## Settings
 
 Stored in the NetworkManager connection profile. Names are defined in

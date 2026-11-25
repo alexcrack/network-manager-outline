@@ -27,6 +27,7 @@ OutlineWidget::OutlineWidget(const NetworkManager::VpnSetting::Ptr &setting, QWi
     connect(m_ui->accessKey, &PasswordField::textChanged, this, &OutlineWidget::slotWidgetChanged);
     connect(m_ui->accessKey, &PasswordField::passwordOptionChanged, this, &OutlineWidget::slotWidgetChanged);
     connect(m_ui->dns, &QLineEdit::textChanged, this, &OutlineWidget::slotWidgetChanged);
+    connect(m_ui->persistent, &QCheckBox::toggled, this, &OutlineWidget::slotWidgetChanged);
 
     KAcceleratorManager::manage(this);
 
@@ -48,6 +49,9 @@ void OutlineWidget::loadConfig(const NetworkManager::Setting::Ptr &setting)
 {
     Q_UNUSED(setting)
     const NMStringMap data = m_setting->data();
+
+    // A new connection has no data yet: stay connected by default.
+    m_ui->persistent->setChecked(data.isEmpty() || m_setting->persistent());
 
     const auto flags = static_cast<NetworkManager::Setting::SecretFlags>(data.value(QStringLiteral(NM_OUTLINE_SECRET_ACCESS_KEY_FLAGS)).toInt());
     OutlineUtils::setPasswordOption(m_ui->accessKey, flags);
@@ -76,6 +80,7 @@ QVariantMap OutlineWidget::setting() const
 {
     NetworkManager::VpnSetting vpn;
     vpn.setServiceType(QStringLiteral(NM_DBUS_SERVICE_OUTLINE));
+    vpn.setPersistent(m_ui->persistent->isChecked());
 
     NMStringMap data;
     NMStringMap secrets;

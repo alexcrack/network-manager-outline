@@ -18,6 +18,12 @@
         <property name="toolTip"><string>The ss://… or ssconf://… key from your Outline provider</string></property>
        </widget>
       </item>
+      <item row="1" column="1">
+       <widget class="QCheckBox" name="persistent">
+        <property name="text"><string>&amp;Stay connected when the network changes</string></property>
+        <property name="toolTip"><string>Keep the VPN up while switching networks or reconnecting Wi-Fi, instead of disconnecting it. Traffic is held back until the new network is up, so nothing leaks outside the VPN.</string></property>
+       </widget>
+      </item>
      </layout>
     </widget>
    </item>

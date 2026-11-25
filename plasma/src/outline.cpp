@@ -69,7 +69,8 @@ VpnUiPlugin::ImportResult OutlineUiPlugin::importConnectionSettings(const QStrin
     nm_connection_add_setting(connection, NM_SETTING(sCon));
 
     NMSettingVpn *sVpn = NM_SETTING_VPN(nm_setting_vpn_new());
-    g_object_set(sVpn, NM_SETTING_VPN_SERVICE_TYPE, NM_DBUS_SERVICE_OUTLINE, nullptr);
+    // Stay connected when the network changes, like a new connection in the editor.
+    g_object_set(sVpn, NM_SETTING_VPN_SERVICE_TYPE, NM_DBUS_SERVICE_OUTLINE, NM_SETTING_VPN_PERSISTENT, TRUE, nullptr);
     // Same default as a new connection in the editor: stored for this user (KWallet).
     nm_setting_vpn_add_data_item(sVpn, NM_OUTLINE_SECRET_ACCESS_KEY_FLAGS, QByteArray::number(int(NM_SETTING_SECRET_FLAG_AGENT_OWNED)).constData());
     nm_setting_vpn_add_secret(sVpn, NM_OUTLINE_SECRET_ACCESS_KEY, key.toUtf8().constData());

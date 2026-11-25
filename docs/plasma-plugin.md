@@ -75,6 +75,10 @@ sudo apt install qt6-base-dev libkf6networkmanagerqt-dev libkf6i18n-dev \
   no secret is saved and the prompt (`askUser`) appears on connect.
 - **Stored settings.** Only non-default values go into `vpn.data`, so the
   service's defaults apply.
+- **Stay connected.** The "Stay connected when the network changes" checkbox
+  is `vpn.persistent`, a field of the VPN setting itself (not `vpn.data`). It
+  is on for new and imported connections; an existing connection keeps its
+  value (see [architecture.md](architecture.md#network-changes)).
 - **Import.** "Import VPN connection…" picks the plugin by file extension and
   the first match wins. The plugin claims `*.txt` only (OpenVPN and WireGuard
   claim `*.conf`). It takes the first `ss://` or `ssconf://` key in the file,
